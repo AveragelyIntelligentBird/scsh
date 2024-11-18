@@ -32,6 +32,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <utime.h>
 #include "cstuff.h"
 #include <limits.h>     /* NGROUPS_MAX on solaris */

@@ -26,7 +26,7 @@
 #include <stropts.h>
 #endif
 
-#ifdef HAVE_PTY_H
+#ifdef HAVE_OPENPTY
 #include <pty.h>		/* openpty() on Tru64, Linux */
 #endif
 
