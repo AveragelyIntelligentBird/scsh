@@ -6,7 +6,7 @@
   (if (and (okay-buffer? buffer index limit)
 	   (port-handler? handler))
       (make-port handler
-		 (enum text-encoding-option latin-1)
+		 (enum text-encoding-option utf-8)
 		 #f
 		 (bitwise-ior input-port-mask open-input-port-mask)
 		 #f		; timestamp (was lock)
@@ -25,7 +25,7 @@
 	   (> limit 0)
 	   (port-handler? handler))
       (make-port handler
-		 (enum text-encoding-option latin-1)
+		 (enum text-encoding-option utf-8)
 		 #f
 		 open-output-port-status
 		 #f		; timestamp (was lock)

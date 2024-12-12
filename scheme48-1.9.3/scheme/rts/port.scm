@@ -299,7 +299,7 @@
 (define (make-unbuffered-output-port handler data)
   (if (port-handler? handler)
       (make-port handler
-		 (enum text-encoding-option latin-1)
+		 (enum text-encoding-option utf-8)
 		 #f
 		 open-output-port-status
 		 #f		; lock     (not used in unbuffered ports)
