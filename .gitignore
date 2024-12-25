@@ -11,3 +11,9 @@ Makefile
 *.sexpr
 
 /.vscode
+*.a
+scheme48vm
+script-interpreter
+scheme48.image
+sysdep.h
+scheme48arch.h
