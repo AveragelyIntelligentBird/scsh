@@ -69,11 +69,13 @@
 
 (define (make-input-fdport fd revealed)
   (let ((port (input-channel+closer->port (make-input-channel fd) close-fdport-channel)))
+    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1    
     (set-fdport! fd port revealed)
     port))
 
 (define (make-output-fdport fd revealed)
   (let ((port (output-channel+closer->port (make-output-channel fd) close-fdport-channel)))
+    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
     (set-fdport! fd port revealed)
     port))
 
@@ -105,6 +107,7 @@
           (list cwd-resource umask-resource euid-resource egid-resource)
           (lambda ()
             (s48-open-file fname options (:optional maybe-mode (file-mode read write)))))))
+    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1    
     (set-fdport! (port->fd port) port 0)
     port))
 
@@ -307,6 +310,17 @@
       (cond ((output-port? stream) (s48name arg ... stream))
             ((integer? stream) body ...)
             (else (error "Not an outport or file descriptor" stream))))))
+
+;; s48 has a bug: the default text codec for new ports is latin-1,
+;; while the reference suggests it should be utf-8; we definitely prefer utf-8
+;; We will manually reset the codec for port-creating forms exposed to user
+(define (make-string-output-port) 
+  (let ((sp (s48-make-string-output-port)))
+    (set-port-text-codec! sp utf-8-codec) 
+    sp))
+;; For (make-string-input-port string), s48 *does* set encoding to utf-8 ¯\_(ツ)_/¯
+;; (call-with-string-output-port proc) and (string-output-port-output port)
+;;   implicitly read data as utf-8, so we fine 
 
 ;;; This one depends upon S48's string ports.
 (define-r4rs-output (display object) output s48-display

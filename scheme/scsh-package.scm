@@ -275,7 +275,9 @@
                                          search-tree-delete
                                          search-tree-ref))
         (subset condvars (make-condvar condvar-value))
-        extended-ports
+        text-codecs
+        (modify extended-ports
+          (rename (make-string-output-port s48-make-string-output-port)))
         scsh-utilities
         signals
         threads
@@ -690,7 +692,7 @@
                              open-output-file))
         formats
         string-collectors
-        extended-ports
+        (modify extended-ports (hide make-string-output-port)) ; redefined
         receiving
         bitwise
         delimited-readers

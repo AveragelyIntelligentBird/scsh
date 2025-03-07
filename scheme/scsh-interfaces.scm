@@ -80,6 +80,7 @@
 	  char-ready?
 	  read-char
 	  display write newline write-char
+    make-string-output-port       ;; Redefines s48
 	  force-output
 	  open-input-file
 	  with-output-to-file with-input-from-file
@@ -503,7 +504,7 @@ argv))
 (define-interface string-ports-interface
   (export make-string-input-port
           call-with-string-output-port
-          make-string-output-port
+          make-string-output-port       ;; Will be redefined in newports
           string-output-port-output))
 
 (define-interface string-collectors-interface

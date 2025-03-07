@@ -32,7 +32,7 @@
 
 ;; 	  (else (error "Argument not fdport or file descriptor" fd/port)))))
 
-(define (move->fdes port target)
+(define (move->fdes port target) ; TODO - revise, increments revelated count??
   (%dup2 (port->fdes port) target))
 
 (define (input-source? fd/port)
