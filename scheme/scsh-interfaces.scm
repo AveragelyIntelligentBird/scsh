@@ -87,7 +87,7 @@
 	  open-output-file
           init-fdports!))
 
-(define-interface scsh-io-interface
+(define-interface scsh-io-interface 
   (export close
           close-after
           current-error-port
@@ -163,6 +163,26 @@
           port-fold reduce-port
           port->fdes))
 
+(define-interface scsh-text-codecs-interface
+  (export ;; Coming from s48 i/o package
+          port-text-codec set-port-text-codec!
+  
+          ;; Coming from s48 text-codecs package
+          spec->text-codec text-codec->spec
+          text-codec? make-text-codec
+          text-codec-names
+          text-codec-decode-char-proc
+          text-codec-encode-char-proc
+
+          (define-text-codec :syntax)
+          find-text-codec
+
+          null-text-codec
+          us-ascii-codec
+          latin-1-codec
+          utf-8-codec
+          utf-16le-codec utf-16be-codec
+          utf-32le-codec utf-32be-codec))
 
 (define-interface scsh-file-interface
   (export open-file

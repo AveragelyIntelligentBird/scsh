@@ -286,6 +286,10 @@
         (subset external-calls (import-lambda-definition-2)))
   (files newports))
 
+(define-structure scsh-port-codecs scsh-text-codecs-interface
+  (open text-codecs
+        (subset i/o (port-text-codec set-port-text-codec!))))
+
 (define-structure scsh-file scsh-file-interface
   (open (modify scheme (hide call-with-input-file
                              call-with-output-file
@@ -639,6 +643,7 @@
   ((scsh-level-0
     (compound-interface scsh-delimited-readers-interface
                         scsh-io-interface
+                        scsh-text-codecs-interface
                         scsh-file-interface
                         scsh-globbing-interface
                         scsh-temp-files-interface
@@ -703,6 +708,7 @@
         scsh-user/group-db
         scsh-process-state
         scsh-newports
+        scsh-port-codecs
         scsh-file
         scsh-temp-files
         scsh-globbing
