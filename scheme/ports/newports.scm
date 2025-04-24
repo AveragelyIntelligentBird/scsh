@@ -2,7 +2,6 @@
 ;;; We use S48 extensible ports.
 ;;; Copyright (c) 1993 by Olin Shivers.
 
-
 ;;; A functional search tree mapping integer file descriptors to ports. I'm
 ;;; putting it all in a cell so that reffing and setting can be done provisionally
 ;;; and be protected by optimistic concurrency.
@@ -101,6 +100,7 @@
 ;;; Open & Close
 ;;; ------------
 
+; TODO add closer
 (define (open-file fname options . maybe-mode)
   (let ((port
          (with-resources-aligned

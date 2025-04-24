@@ -86,7 +86,28 @@
 	  with-output-to-file with-input-from-file
 	  call-with-input-file call-with-output-file
 	  open-output-file
-          init-fdports!))
+    init-fdports!))
+
+(define-interface scsh-bufpol-interface 
+  (export 
+    ; Bufpol enum  
+    buf-policy buf-policy? 
+    buf-policies
+    buf-policy-name buf-policy-index
+     
+    ; Helper bufpol accessors
+    bufpol/block
+    bufpol/line
+    bufpol/none
+    
+    ; Bufpol equality
+    buf-policy=?
+    
+    ; Setter for bufpol on a port
+    set-port-buffering
+  
+    write-string ))
+
 
 (define-interface scsh-io-interface 
   (export close

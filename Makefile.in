@@ -66,7 +66,7 @@ SCHEME = scheme/command-line.scm \
 	 scheme/enumconst.scm \
 	 scheme/environment.scm \
 	 scheme/event.scm \
-	 scheme/fdports.scm \
+	 scheme/ports/fdports.scm \
 	 scheme/file.scm \
 	 scheme/fileinfo.scm \
 	 scheme/filesys.scm \
@@ -81,8 +81,8 @@ SCHEME = scheme/command-line.scm \
 	 scheme/low-interrupt.scm \
 	 scheme/md5.scm \
 	 scheme/meta-arg.scm \
-	 scheme/newports.scm \
-	 scheme/port-collect.scm \
+	 scheme/ports/newports.scm \
+	 scheme/ports/port-collect.scm \
 	 scheme/process-high-level.scm \
 	 scheme/process-state.scm \
 	 scheme/process.scm \

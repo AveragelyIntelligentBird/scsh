@@ -210,7 +210,7 @@
         (subset external-calls (import-lambda-definition-2)))
   (files process-state))
 
-(define-structure scsh-newports scsh-newports-interface
+(define-structure scsh-newports (compound-interface scsh-newports-interface scsh-bufpol-interface)
   (open (modify scheme (rename (char-ready?  s48-char-ready?)
                                (read-char    s48-read-char)
                                (display      s48-display)
@@ -249,7 +249,9 @@
         channel-i/o
         (subset channel-ports (input-channel+closer->port
                                output-channel+closer->port
-                               port->channel))
+                               port->channel
+                               ; Bufpol fresh unbuf ports
+                               output-channel->port))
         ports
         (subset threads-internal (thread-continuation))
         (subset posix-i/o (fd-port?
@@ -285,8 +287,11 @@
         scsh-file-syscalls
         scsh-resources
         scsh-process-state
-        (subset external-calls (import-lambda-definition-2)))
-  (files newports))
+        (subset external-calls (import-lambda-definition-2))
+        byte-vectors
+        session-data
+        finite-types) ; Bufpol
+  (files (ports newports) (ports port-bufpol)))
 
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs
@@ -422,7 +427,7 @@
         (subset scsh-utilities (check-arg stringify))
         scsh-file-syscalls
         scsh-newports)
-  (files fdports))
+  (files (ports fdports)))
 
 (define-structure scsh-signals scsh-signals-interface
   (open scheme
@@ -588,7 +593,7 @@
         (subset srfi-1 (reverse!))
         delimited-readers
         string-collectors)
-  (files port-collect))
+  (files (ports port-collect)))
 
 (define-structure scsh-high-level-processes scsh-high-level-process-interface
   (for-syntax (open scsh-syntax-helpers scheme))
@@ -645,6 +650,7 @@
   ((scsh-level-0
     (compound-interface scsh-delimited-readers-interface
                         scsh-io-interface
+                        scsh-bufpol-interface
                         scsh-text-codecs-interface
                         scsh-file-interface
                         scsh-globbing-interface
