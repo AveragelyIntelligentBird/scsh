@@ -81,20 +81,20 @@
 ;;; installed in *fdports*
 (define (fdport? x)
   (and (or (input-port? x) (output-port? x))
-       (fd-port? x)                     ;from posix-i/o
-       (maybe-ref-fdport (port->fd x))
+       (fdport->channel x)  ; Has OS-channel in the data field
+       (maybe-ref-fdport (fdport->fd x))
        #t))
 
 (define (fdport:revealed fdport)
   (check-arg fdport? fdport fdport:revealed)
-  (maybe-ref-fdport-revealed (port->fd fdport)))
+  (maybe-ref-fdport-revealed (fdport->fd fdport)))
 
 (define (set-fdport:revealed! fdport revealed)
   (check-arg fdport? fdport set-fdport:revealed!)
-  (set-fdport! (port->fd fdport) fdport revealed))
+  (set-fdport! (fdport->fd fdport) fdport revealed))
 
 (define (fdport-channel-ready? fdport)
-  (channel-ready? (port->channel fdport)))
+  (channel-ready? (fdport->channel fdport)))
 
 ;;; Open & Close
 ;;; ------------
@@ -106,16 +106,16 @@
             (list cwd-resource umask-resource euid-resource egid-resource)
             (lambda ()
               (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
-          (channel (port->channel s48-port))  ; TODO: alias with our struct
+          (channel (s48-port->channel s48-port))
           (port (if (input-port? s48-port)
                   (really-make-input-fdport channel bufpol/block) ; Block buf by default
                   (really-make-output-fdport channel bufpol/block))))
-    ; (display s48-port)
-    ; (newline)
-    ; (display channel)
-    ; (newline)
-    ; (display port)
-    (set-fdport! (port->fd port) port 0)
+    (display s48-port)
+    (newline)
+    (display channel)
+    (newline)
+    (display port)
+    (set-fdport! (fdport->fd port) port 0)
     port))
 
 (define (open-input-file fname . maybe-options)
@@ -166,10 +166,11 @@
         (error "fdes was already assigned to an inport" fd)
         port)))
 
+; TODO move to separate file to disambiguate with fdport->fd
 (define (port->fdes port)
   (check-arg open-fdport? port port->fdes)
   (increment-revealed-count port 1)
-  (port->fd port))
+  (fdport->fd port))
 
 (define (call/fdes fd/port proc)
   (cond ((integer? fd/port)
@@ -190,7 +191,7 @@
 
 (define (sleazy-call/fdes fd/port proc)
   (proc (cond ((integer? fd/port) fd/port)
-              ((fd-port? fd/port) (port->fd fd/port)) ;notice fd-port? instead of fdport?
+              ((fdport->channel fd/port) (fdport->fd fd/port)) ;notice fd-port? instead of fdport?
               (else (error "Not a file descriptor or fdport." fd/port)))))
 
 ;;; Random predicates and arg checkers
@@ -201,7 +202,7 @@
 
 (define (fdport-open? port)
   (check-arg fdport? port fdport-open?)
-  (eq? (channel-status (port->channel port))
+  (eq? (channel-status (fdport->channel port))
        (enum channel-status-option closed)))
 
 ;;; Initialise the system
@@ -213,9 +214,9 @@
 
 
 (define (init-fdports!)
-  (set-fdport! (port->fd (current-input-port)) (current-input-port) 1)
-  (set-fdport! (port->fd (current-output-port)) (current-output-port) 1)
-  (set-fdport! (port->fd (current-error-port)) (current-error-port) 1))
+  (set-fdport! (s48-port->fd (current-input-port)) (current-input-port) 1)
+  (set-fdport! (s48-port->fd (current-output-port)) (current-output-port) 1)
+  (set-fdport! (s48-port->fd (current-error-port)) (current-error-port) 1))
 
 ;;; Generic port operations
 ;;; -----------------------
@@ -241,13 +242,13 @@
 (define (evict-ports fd)
   (cond ((maybe-ref-fdport-port fd) =>       ; Shouldn't bump the revealed count.
          (lambda (port)
-             (%move-fdport (port->fd (dup port)) port 0)  ;s48's dup modifies port's channel for us
+             (%move-fdport (fdport->fd (dup port)) port 0)  ;s48's dup modifies port's channel for us
              #t))
         (else #f)))
 
 (define (%move-fdport old-fd port new-revealed)
   (delete-fdport! old-fd)
-  (set-fdport! (port->fd port) port new-revealed)
+  (set-fdport! (fdport->fd port) port new-revealed)
   #f)  ; JMG: It used to return #f on succes in 0.5.1, so we do the same
 
 (define (close-fdes fd)

@@ -222,7 +222,6 @@
     exceptions conditions signal-conditions
     architecture		; channel-opening options
     (subset primitives      (channel-parameter))
-    (subset channel-ports (port->channel))
     handle
     debug-messages		; for error messages
     (subset util		(unspecific))
@@ -243,6 +242,7 @@
                       with-output-to-file
                       open-input-file
                       open-output-file))
+        scsh-channel-ports
         (subset tables (table-set!
                         table-ref
                         make-integer-table))
@@ -267,19 +267,13 @@
         i/o-internal
         channels
         channel-i/o
-        scsh-channel-ports
         (subset exceptions (assertion-violation))
-        (subset channel-ports (port->channel))
-        ; (modify channel-ports (rename (port->channel s48-port->channel)) (expose port->channel))
+        (modify channel-ports (rename (port->channel s48-port->channel)) (expose port->channel))
         ports
         (subset threads-internal (thread-continuation))
-        (subset posix-i/o (fd-port?
-                           port->fd
-                           dup))
-        ; (modify posix-i/o (rename (port->fd s48-port->fd) (fd-port? s48-fd-port?)) 
-        ;   (expose fd-port?
-        ;           port->fd
-        ;           dup))
+        (modify posix-i/o (rename (port->fd s48-port->fd)) 
+          (expose port->fd
+                  dup)) ; TODO: revisit, make sure there are no internal channel-cell inconsistensies
         (modify posix-files (rename (open-file s48-open-file))
                 (expose open-file
                         file-options

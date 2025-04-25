@@ -46,9 +46,8 @@
     make-unbuf-input-fdport
     channel-buffer-size
 
-    ; port->channel
-    ; port->fd
-    ; fd-port?
+    fdport->channel
+    fdport->fd
 
 	  force-channel-output-ports!))	;posix
 

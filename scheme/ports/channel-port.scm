@@ -32,22 +32,17 @@
 
 ; Extracting the channel from a port.
 
-; (define (port->channel port)
-;   (let ((data (port-data port)))
-;     (if (channel-cell? data)
-; 	(channel-cell-ref data)
-; 	#f)))
+(define (fdport->channel port)
+  (let ((data (port-data port)))
+    (if (channel-cell? data)
+	(channel-cell-ref data)
+	#f)))
 
-; (define (port->fd port)
-;   (let ((channel (port->channel port)))
-;     (if channel
-; 	(channel-os-index channel)
-; 	#f)))
-
-; (define (fd-port? port)
-;   (if (port->channel port)
-;       #t
-;       #f))
+(define (fdport->fd port)
+  (let ((channel (fdport->channel port)))
+    (if channel
+				(channel-os-index channel)
+				#f)))
 
 ; Closing a port's channel.  This is called with a proposal already in place.
 
@@ -411,7 +406,7 @@
 
 (define (force-channel-output-ports!)
   (for-each (lambda (port)
-	      (if (port->channel port)
+	      (if (fdport->channel port)
 		  (force-output-if-open port)))
 	    (periodically-flushed-ports)))
 
