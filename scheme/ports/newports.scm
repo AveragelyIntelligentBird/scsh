@@ -67,13 +67,12 @@
   (close-channel channel))
 
 (define (make-input-fdport/fd fd revealed)
-  (let ((port (really-make-input-fdport (make-input-channel fd) bufpol/block)))
+  (let ((port (make-input-fdport (make-input-channel fd))))
     (set-fdport! fd port revealed)
     port))
 
-(define (make-output-fdport fd revealed)
-  (let ((port (output-channel+closer->port (make-output-channel fd) close-fdport-channel)))
-    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+(define (make-output-fdport/fd fd revealed)
+  (let ((port (make-output-fdport (make-output-channel fd))))
     (set-fdport! fd port revealed)
     port))
 
@@ -99,7 +98,7 @@
 ;;; Open & Close
 ;;; ------------
 
-; TODO add closer
+; TODO implement our own open-file to avoid registering output port as "periodically flushed" at all smh
 (define (open-file fname options . maybe-mode)
   (let* ((s48-port
           (with-resources-aligned
@@ -108,8 +107,8 @@
               (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
           (channel (s48-port->channel s48-port))
           (port (if (input-port? s48-port)
-                  (make-input-fdport channel bufpol/block) ; Block buf by default
-                  (really-make-output-fdport channel bufpol/block 100))))
+                  (make-input-fdport channel)
+                  (make-output-fdport/bufpol channel bufpol/line))))
     (set-fdport! (fdport->fd port) port 0)
     port))
 
@@ -156,7 +155,7 @@
         port)))
 
 (define (fdes->outport fd)
-  (let ((port (fdes->port fd make-output-fdport)))
+  (let ((port (fdes->port fd make-output-fdport/fd)))
     (if (not (output-port? port))
         (error "fdes was already assigned to an inport" fd)
         port)))
@@ -343,6 +342,18 @@
 (define-r4rs-output (write-char char) output s48-write-char
   (let ((port (fdes->outport output)))
     (s48-write-char char port)))
+
+; TODO replace the faulty write chars with an actually correct thing wat
+(define (sanity-write-char char port) 
+  ((port-handler-char (port-handler port)) port char))
+
+(define (sanity-write-string string port) 
+  (let ((write-ch (port-handler-char (port-handler port)))
+        (len (string-length string)))
+  (do ((i 0 (+ i 1)))
+      ((>= i len))
+        (write-ch port (string-ref string i)))
+  (newline port)))
 
 ;;; S48's force-output doesn't default to forcing (current-output-port).
 (define-r4rs-output (force-output) output s48-force-output

@@ -39,20 +39,23 @@
 
 (define-interface scsh-channel-ports-interface
   (export 
-	  output-channel->port          ;usual-resumer, posix
-	  output-channel+closer->port	  ;big/socket.scm
-
-    make-buf-input-fdport
-    make-unbuf-input-fdport
-    channel-buffer-size
-
     fdport->channel
     fdport->fd
 
-	  force-channel-output-ports!))	;posix
+    make-blockbuf-input-fdport
+    make-unbuf-input-fdport
+
+    make-blockbuf-output-fdport
+    make-linebuf-output-fdport
+    make-unbuf-output-fdport
+
+    channel-buffer-size
+  ))	
 
 (define-interface scsh-newports-interface
-  (export call/fdes
+  (export 
+  make-output-fdport ; TODO - remove
+    call/fdes
 	  sleazy-call/fdes
 	  fdes->inport
 	  fdes->outport
@@ -61,7 +64,7 @@
 	  %move-fdport
 	  close-fdes
 	  make-input-fdport/fd
-	  make-output-fdport
+	  make-output-fdport/fd
 	  close
 	  seek/set
 	  open-file
@@ -94,6 +97,8 @@
 	  char-ready?
 	  read-char
 	  display write newline write-char
+    sanity-write-char
+    sanity-write-string
     make-string-output-port       ;; Redefines s48
 	  force-output
 	  open-input-file
@@ -146,6 +151,8 @@
           char-ready?
           read-char
           write-char
+          sanity-write-char
+          sanity-write-string
           display
           newline
           input-port?

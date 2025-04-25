@@ -66,7 +66,7 @@
   (apply really-dup->port make-input-fdport/fd fd/port maybe-target))
 
 (define (dup->outport fd/port . maybe-target)
-  (apply really-dup->port make-output-fdport fd/port maybe-target))
+  (apply really-dup->port make-output-fdport/fd fd/port maybe-target))
 
 (define (really-dup->port port-maker fd/port . maybe-target)
   (let ((fd (apply dup->fdes fd/port maybe-target)))

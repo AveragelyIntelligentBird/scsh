@@ -315,7 +315,7 @@
 	((if (or (file-options-on? flags (file-options read-only))
 		 (file-options-on? flags (file-options read-write)))
        make-input-fdport/fd
-	     make-output-fdport)
+	     make-output-fdport/fd)
 	 fd 1))))
 
 (import-lambda-definition-2 %open-control-tty (ttyname flags) "open_ctty")

@@ -24,38 +24,71 @@
 
 ;; Actual fdport makers
 
-(define (make-input-fdport channel bufpol . maybe-buffer-size)
+(define (make-input-fdport channel . maybe-buffer-size)
   (let ((buffer-size (if (null? maybe-buffer-size) 
                          (channel-buffer-size) 
                          (car maybe-buffer-size))))
-  (really-make-input-fdport channel bufpol buffer-size))
-)
+  (really-make-input-fdport channel bufpol/block buffer-size))) ; Block buffering default
 
 (define (really-make-input-fdport channel bufpol buffer-size)
-    (let* ((bufpol (if (= 1 buffer-size) bufpol/none bufpol))) 
-    (cond 
-        ; Errors
-        ((>= 0 buffer-size) 
-            (assertion-violation 'really-make-input-fdport
-              "invalid buffer size"
-              really-make-input-fdport channel buffer-size))
-        ((buf-policy=? bufpol bufpol/line)
+  (let* ((bufpol (if (= 1 buffer-size) bufpol/none bufpol))) 
+  (cond 
+      ; Errors
+      ((or (not (integer? buffer-size)) (>= 0 buffer-size)) 
           (assertion-violation 'really-make-input-fdport
-            "line buffering is invalid on input ports"
-            really-make-input-fdport channel bufpol))
-        ; Valid ports
-        ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
-          (debug-message "Making block buf port")
-          (make-buf-input-fdport channel buffer-size close-fdport-channel))
-        ((buf-policy=? bufpol bufpol/none)
-          (debug-message "Making unbuf port")
-          (make-unbuf-input-fdport channel close-fdport-channel)))))
+            "invalid buffer size"
+            really-make-input-fdport channel buffer-size))
+      ((not (channel? channel))
+          (assertion-violation 'really-make-input-fdport
+            "invalid channel"
+            really-make-input-fdport channel buffer-size))
+      ((buf-policy=? bufpol bufpol/line)
+        (assertion-violation 'really-make-input-fdport
+          "line buffering is invalid on input ports"
+          really-make-input-fdport channel bufpol))
+      ; Valid ports
+      ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
+        (debug-message "Making block buf input port")
+        (make-blockbuf-input-fdport channel buffer-size close-fdport-channel))
+      ((buf-policy=? bufpol bufpol/none)
+        (debug-message "Making unbuf input port")
+        (make-unbuf-input-fdport channel close-fdport-channel)))))
 
+(define (make-output-fdport channel . maybe-buffer-size)
+  (let ((buffer-size (if (null? maybe-buffer-size) 
+                         (channel-buffer-size) 
+                         (car maybe-buffer-size))))
+  (really-make-output-fdport channel bufpol/block buffer-size))) ; Block buffering default
+
+; TODO - remove, this is just for testing
+(define (make-output-fdport/bufpol channel bufpol . maybe-buffer-size)
+  (let ((buffer-size (if (null? maybe-buffer-size) 
+                         (channel-buffer-size) 
+                         (car maybe-buffer-size))))
+  (really-make-output-fdport channel bufpol buffer-size)))
           
-; TODO - implement
-(define (really-make-output-fdport channel bufpol . maybe-buffer-size)
-    (display "I'm making output port\n") 
-    #f)
+(define (really-make-output-fdport channel bufpol buffer-size)
+  (let* ((bufpol (if (= 0 buffer-size) bufpol/none bufpol))) 
+  (cond 
+      ; Errors
+      ((or (not (integer? buffer-size)) (> 0 buffer-size))
+          (assertion-violation 'really-make-output-fdport
+            "invalid buffer size"
+            really-make-output-fdport channel buffer-size))
+      ((not (channel? channel))
+          (assertion-violation 'really-make-output-fdport
+            "invalid channel"
+            really-make-output-fdport channel buffer-size))
+      ; Valid ports
+      ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
+        (debug-message "Making block buf output port")
+        (make-blockbuf-output-fdport channel buffer-size close-fdport-channel))
+      ((buf-policy=? bufpol bufpol/line)
+        (debug-message "Making line buf output port")
+        (make-linebuf-output-fdport channel buffer-size close-fdport-channel))
+      ((buf-policy=? bufpol bufpol/none)
+        (debug-message "Making unbuf output port")
+        (make-unbuf-output-fdport channel close-fdport-channel)))))
 
 
 ; Since a different buffering policy implies a different set of handler, we make a 
@@ -77,3 +110,5 @@
     (set-port-text-codec! new-port (port-text-codec port)) 
     (set-fdport! cur-port-fd new-port cur-port-revealed-count)
     (set! port new-port))) 
+    ; This will not work nor can we set the handler 
+    ; -- meaning the handlers needs to hook into the struct and decide on which handler to use?

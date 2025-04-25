@@ -111,13 +111,13 @@
 (define buf-input-fdport-handler
   (make-buffered-input-port-handler
      (lambda (cell)
-       (list 'buf-input-fdport (channel-cell-ref cell)))
+       (list 'blockbuf-input-fdport (channel-cell-ref cell)))
      port-channel-closer
      (make-buffer-filler #f)
      channel-port-ready?))
 
 ; Assuming all arguments are valid 
-(define (make-buf-input-fdport channel buffer-size closer)
+(define (make-blockbuf-input-fdport channel buffer-size closer)
 	(let ((port
 	       (make-buffered-input-port 
 						buf-input-fdport-handler
@@ -180,7 +180,7 @@
 	port))
 
 ;----------------
-; Output ports
+; Buffered Output ports
 
 ; A. No write already in progress
 ;     -> start one
@@ -193,41 +193,40 @@
 
 (define (empty-buffer! port necessary?)
   (let* ((cell (port-data port))
-	 (condvar (channel-cell-condvar cell)))
-
-    (cond ((not (channel-cell-in-use? cell))
-	   (let ((buffer (port-buffer port))
-		 (count (provisional-port-index port)))
-	     (set-channel-cell-in-use?! cell #t)
-	     (send-some port 0 necessary?)))
+	     (condvar (channel-cell-condvar cell)))
+    (cond 
+	 ((not (channel-cell-in-use? cell))
+	  (let ((buffer (port-buffer port))
+			(count (provisional-port-index port)))
+		(set-channel-cell-in-use?! cell #t)
+		(send-some port 0 necessary?)))
 	  ((condvar-has-value? condvar)
 	   (let ((result (condvar-value condvar)))
 	     (set-condvar-has-value?! condvar #f)
 	     (if (i/o-error? result)
-		 (begin
-		   ;; #### We should probably maintain some kind of
-		   ;; "error status" with the channel cell that allows
-		   ;; actual recovery.
-		   ;; The way it is, we just pretend we're done so the
-		   ;; the periodic buffer flushing doesn't annoy the heck
-		   ;; out of us.
-		   (provisional-set-port-index! port 0)
-		   ;; good housekeeping; also keeps port-buffer flusher sane
-		   (provisional-set-port-pending-eof?! port #f)
-		   (note-buffer-reuse! port)
-		   (set-channel-cell-in-use?! cell #f)
-		   (if (maybe-commit)
-		       (signal-condition result)
-		       #f))
-		 (let ((sent (+ result (channel-cell-sent cell))))
-		   (if (< sent
-			  (provisional-port-index port)) 
-		       (send-some port sent necessary?)
-		       (begin
-			 (provisional-set-port-index! port 0)
-			 (note-buffer-reuse! port)
-			 (set-channel-cell-in-use?! cell #f)
-			 (maybe-commit)))))))
+			(begin
+				;; #### We should probably maintain some kind of
+				;; "error status" with the channel cell that allows
+				;; actual recovery.
+				;; The way it is, we just pretend we're done so the
+				;; the periodic buffer flushing doesn't annoy the heck
+				;; out of us.
+				(provisional-set-port-index! port 0)
+				;; good housekeeping; also keeps port-buffer flusher sane
+				(provisional-set-port-pending-eof?! port #f)
+				(note-buffer-reuse! port)
+				(set-channel-cell-in-use?! cell #f)
+				(if (maybe-commit)
+					(signal-condition result)
+					#f))
+			(let ((sent (+ result (channel-cell-sent cell))))
+				(if (< sent (provisional-port-index port)) 
+					(send-some port sent necessary?)
+					(begin
+						(provisional-set-port-index! port 0)
+						(note-buffer-reuse! port)
+						(set-channel-cell-in-use?! cell #f)
+						(maybe-commit)))))))
 	  (necessary?
 	   (maybe-commit-and-wait-for-condvar condvar #f))
 	  (else
@@ -242,160 +241,91 @@
     (channel-maybe-commit-and-write (channel-cell-ref cell)
 				    (port-buffer port)
 				    sent
-				    (- (provisional-port-index port)
-				       sent)
+				    (- (provisional-port-index port) sent)
 				    (channel-cell-condvar cell)
 				    wait?)))
 
-(define output-channel-handler
+(define blockbuf-output-fdport-handler
   (make-buffered-output-port-handler
      (lambda (cell)
-       (list 'output-port
-	     (channel-cell-ref cell)))
+       (list 'blockbuf-output-fdport (channel-cell-ref cell)))
      port-channel-closer
      empty-buffer!
      channel-port-ready?))
 
-(define (output-channel->port channel . maybe-buffer-size)
-  (let ((port
-	 (if (and (not (null? maybe-buffer-size))
-		  (eq? 0 (car maybe-buffer-size)))
-	     (make-unbuffered-output-port unbuffered-output-handler
-					  (make-channel-cell channel close-channel))
-	     (real-output-channel->port channel maybe-buffer-size close-channel))))
-    (set-port-crlf?! port (channel-crlf?))
-    port))
+(define (make-blockbuf-output-fdport channel buffer-size closer)
+	(let ((port
+	       (make-buffered-output-port 
+				blockbuf-output-fdport-handler
+				(make-channel-cell channel closer)
+				(make-byte-vector buffer-size 0)
+				0
+				buffer-size)))
+	; (periodically-force-output! port) ; TODO do we want to enable this at all in scsh? maybe bufpol/auto?
+	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
+	(set-port-crlf?! port (channel-crlf?))
+	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+	port))
 
-; This is for sockets, which have their own closing mechanism.
+(define linebuf-output-fdport-handler
+  (let* ((handler 
+			(make-buffered-output-port-handler
+				(lambda (cell)
+					(list 'linebuf-output-fdport (channel-cell-ref cell)))
+				port-channel-closer
+				empty-buffer!
+				channel-port-ready?))
+         (char-handler (port-handler-char handler)))
+		; Remaking the port because s48 does not define a setter for handlers :<
+		(make-port-handler 
+			(port-handler-discloser handler)
+			(port-handler-close handler) 
+			(port-handler-byte handler)
+			; Line buffering only makes sense for write-char
+			(lambda (port ch) 
+				(char-handler port ch)
+				(if (char=? ch #\newline) 
+					(force-output port))) ; Raise error if port is not open
+			(port-handler-block handler)
+			(port-handler-ready? handler)
+			(port-handler-force handler))))
 
-(define (output-channel+closer->port channel closer . maybe-buffer-size)
-  (real-output-channel->port channel maybe-buffer-size closer))
-	     
-; Dispatch on the buffer size to make the appropriate port.  A buffer
-; size of zero creates an unbuffered port.  Buffered output ports get a
-; finalizer to flush the buffer if the port is GC'ed.
-
-(define (real-output-channel->port channel maybe-buffer-size closer)
-  (let ((buffer-size (if (null? maybe-buffer-size)
-			 (channel-buffer-size)
-			 (car maybe-buffer-size))))
-    (if  (or (not (integer? buffer-size))
-	     (< buffer-size 0)
-	     (not (channel? channel)))
-	 (assertion-violation 'real-output-channel->port
-			      "invalid argument"
-			      output-channel->port channel buffer-size)
-	 (let ((port (make-buffered-output-port output-channel-handler
-						(make-channel-cell channel
-								   closer)
-						(make-byte-vector buffer-size 0)
-						0
-						buffer-size)))
-	   (periodically-force-output! port)
-	   (add-finalizer! port force-output-if-open)
-	   port))))
-	     
-;----------------
-; Various ways to open ports on files.
-
-; First a generic procedure to do the work.
-
-(define (maybe-open-file op file-name option close-silently? coercion)
-  (let ((thing
-	 (with-handler
-	  (lambda (c punt)
-	    (cond
-	     ((and (vm-exception? c)
-		   (eq? 'os-error
-			(vm-exception-reason c)))
-	      (punt (condition
-		     (make-i/o-error)
-		     (make-who-condition op)
-		     (make-message-condition
-		      (os-string->string
-		       (byte-vector->os-string
-			(os-error-message (car (reverse (condition-irritants c)))))))
-		     (make-irritants-condition (list file-name)))))
-	     (else
-	      (punt))))
-	  (lambda ()
-	    (let ((file-name/os (x->os-string file-name)))
-	      (open-channel (os-string->byte-vector file-name/os)
-			    (os-string->string file-name/os)
-			    option close-silently?))))))
-    (coercion thing (channel-buffer-size))))
-  
-; And then all of RnRS's file opening procedures.
-
-; (define (really-open-input-file op string close-silently?)
-;   (maybe-open-file op
-; 		   string
-; 		   (enum channel-status-option input)
-; 		   close-silently?
-; 		   input-channel->port))
-
-; (define (open-input-file string)
-;   (really-open-input-file 'open-input-file string  #f))
-
-(define (really-open-output-file op string close-silently?)
-  (maybe-open-file op
-		   string
-		   (enum channel-status-option output)
-		   close-silently?
-		   output-channel->port))
-
-(define (open-output-file string)
-  (really-open-output-file 'open-output-file string #f))
-
-; (define (call-with-input-file string proc)
-;   (let* ((port (really-open-input-file 'call-with-input-file string #t))
-;          (results (call-with-values (lambda () (proc port))
-; 				    list)))
-;     (close-input-port port)
-;     (apply values results)))
-
-(define (call-with-output-file string proc)
-  (let* ((port (really-open-output-file 'call-with-output-file string #t))
-         (results (call-with-values (lambda () (proc port))
-				    list)))
-    (close-output-port port)
-    (apply values results)))
-
-; (define (with-input-from-file string thunk)
-;   (call-with-input-file string
-;     (lambda (port)
-;       (call-with-current-input-port port thunk))))
-
-(define (with-output-to-file string thunk)
-  (call-with-output-file string
-    (lambda (port)
-      (call-with-current-output-port port thunk))))
+(define (make-linebuf-output-fdport channel buffer-size closer)
+	(let ((port
+	       (make-buffered-output-port 
+				linebuf-output-fdport-handler
+				(make-channel-cell channel closer)
+				(make-byte-vector buffer-size 0)
+				0
+				buffer-size)))
+	; (periodically-force-output! port) ; TODO do we want to enable this at all in scsh? maybe bufpol/auto?
+	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
+	(set-port-crlf?! port (channel-crlf?))
+	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+	port))
 
 ;----------------
-; Flush the output buffers of all channel output ports.  This is done before
-; forking the current process.
-
-(define (force-channel-output-ports!)
-  (for-each (lambda (port)
-	      (if (fdport->channel port)
-		  (force-output-if-open port)))
-	    (periodically-flushed-ports)))
-
-;----------------
-; Unbuffered output channel ports.
-; This is used for the initial current-error-port.
+; Unbuffered Output ports
 
 (define unbuffered-output-handler
-  (make-unbuffered-output-port-handler (lambda (port)
-					 (list 'output-port
-					       (channel-cell-ref (port-data port))))
-				       (lambda (port)
-					 (port-channel-closer (port-data port)))
-				       (lambda (port buffer start count)
-					 (channel-write (channel-cell-ref (port-data port))
-							buffer start count))
-				       (lambda (port)			; ready
-					 (channel-ready? (channel-cell-ref (port-data port))))))
+  (make-unbuffered-output-port-handler 
+  		(lambda (port)
+			(list 'unbuf-output-fdport (channel-cell-ref (port-data port))))
+		(lambda (port)
+			(port-channel-closer (port-data port)))
+		(lambda (port buffer start count)
+			(channel-write (channel-cell-ref (port-data port)) buffer start count))
+		(lambda (port)			; ready
+			(channel-ready? (channel-cell-ref (port-data port))))))
+
+(define (make-unbuf-output-fdport channel closer)
+	(let ((port 
+			(make-unbuffered-output-port unbuffered-output-handler
+				(make-channel-cell channel closer))))
+	(set-port-crlf?! port (channel-crlf?))
+	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+	port))
+
 
 ; Utilities
 
