@@ -37,6 +37,21 @@
 	  %stat-file %stat-fdes
 	  %sync-file %sync-file-system))
 
+(define-interface scsh-channel-ports-interface
+  (export 
+	  output-channel->port          ;usual-resumer, posix
+	  output-channel+closer->port	  ;big/socket.scm
+
+    make-buf-input-fdport
+    make-unbuf-input-fdport
+    channel-buffer-size
+
+    ; port->channel
+    ; port->fd
+    ; fd-port?
+
+	  force-channel-output-ports!))	;posix
+
 (define-interface scsh-newports-interface
   (export call/fdes
 	  sleazy-call/fdes
@@ -104,10 +119,8 @@
     buf-policy=?
     
     ; Setter for bufpol on a port
-    set-port-buffering
-  
-    write-string ))
-
+    ;set-port-buffering
+))
 
 (define-interface scsh-io-interface 
   (export close

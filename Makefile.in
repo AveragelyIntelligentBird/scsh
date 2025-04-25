@@ -83,6 +83,8 @@ SCHEME = scheme/command-line.scm \
 	 scheme/meta-arg.scm \
 	 scheme/ports/newports.scm \
 	 scheme/ports/port-collect.scm \
+	 scheme/ports/portmakers.scm \
+	 scheme/ports/channel-port.scm \
 	 scheme/process-high-level.scm \
 	 scheme/process-state.scm \
 	 scheme/process.scm \

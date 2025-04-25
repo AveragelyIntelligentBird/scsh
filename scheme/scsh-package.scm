@@ -210,7 +210,27 @@
         (subset external-calls (import-lambda-definition-2)))
   (files process-state))
 
-(define-structure scsh-newports (compound-interface scsh-newports-interface scsh-bufpol-interface)
+
+(define-structure scsh-channel-ports scsh-channel-ports-interface
+  (open scheme-level-1 byte-vectors define-record-types ascii
+    ports
+    i/o i/o-internal text-codecs
+    channels channel-i/o
+    os-strings
+    proposals
+    condvars
+    exceptions conditions signal-conditions
+    architecture		; channel-opening options
+    (subset primitives      (channel-parameter))
+    (subset channel-ports (port->channel))
+    handle
+    debug-messages		; for error messages
+    (subset util		(unspecific))
+    (subset primitives	(add-finalizer! os-error-message)))
+  (files (ports channel-port)))
+
+; TODO break up this into more reasonable pieces
+(define-structure scsh-newports (compound-interface scsh-newports-interface scsh-bufpol-interface) 
   (open (modify scheme (rename (char-ready?  s48-char-ready?)
                                (read-char    s48-read-char)
                                (display      s48-display)
@@ -247,16 +267,19 @@
         i/o-internal
         channels
         channel-i/o
-        (subset channel-ports (input-channel+closer->port
-                               output-channel+closer->port
-                               port->channel
-                               ; Bufpol fresh unbuf ports
-                               output-channel->port))
+        scsh-channel-ports
+        (subset exceptions (assertion-violation))
+        (subset channel-ports (port->channel))
+        ; (modify channel-ports (rename (port->channel s48-port->channel)) (expose port->channel))
         ports
         (subset threads-internal (thread-continuation))
         (subset posix-i/o (fd-port?
                            port->fd
                            dup))
+        ; (modify posix-i/o (rename (port->fd s48-port->fd) (fd-port? s48-fd-port?)) 
+        ;   (expose fd-port?
+        ;           port->fd
+        ;           dup))
         (modify posix-files (rename (open-file s48-open-file))
                 (expose open-file
                         file-options
@@ -291,7 +314,7 @@
         byte-vectors
         session-data
         finite-types) ; Bufpol
-  (files (ports newports) (ports port-bufpol)))
+  (files (ports newports) (ports portmakers) (ports port-bufpol)))
 
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs
@@ -716,6 +739,7 @@
         scsh-user/group-db
         scsh-process-state
         scsh-newports
+        scsh-channel-ports
         scsh-port-codecs
         scsh-file
         scsh-temp-files

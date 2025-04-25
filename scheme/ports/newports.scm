@@ -67,8 +67,7 @@
   (close-channel channel))
 
 (define (make-input-fdport fd revealed)
-  (let ((port (input-channel+closer->port (make-input-channel fd) close-fdport-channel)))
-    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1    
+  (let ((port (really-make-input-fdport (make-input-channel fd) bufpol/block)))
     (set-fdport! fd port revealed)
     port))
 
@@ -102,12 +101,20 @@
 
 ; TODO add closer
 (define (open-file fname options . maybe-mode)
-  (let ((port
-         (with-resources-aligned
-          (list cwd-resource umask-resource euid-resource egid-resource)
-          (lambda ()
-            (s48-open-file fname options (:optional maybe-mode (file-mode read write)))))))
-    (set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1    
+  (let* ((s48-port
+          (with-resources-aligned
+            (list cwd-resource umask-resource euid-resource egid-resource)
+            (lambda ()
+              (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
+          (channel (port->channel s48-port))  ; TODO: alias with our struct
+          (port (if (input-port? s48-port)
+                  (really-make-input-fdport channel bufpol/block) ; Block buf by default
+                  (really-make-output-fdport channel bufpol/block))))
+    ; (display s48-port)
+    ; (newline)
+    ; (display channel)
+    ; (newline)
+    ; (display port)
     (set-fdport! (port->fd port) port 0)
     port))
 
