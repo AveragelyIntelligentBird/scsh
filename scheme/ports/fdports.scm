@@ -63,7 +63,7 @@
       (sleazy-call/fdes fd/port %dup)))
 
 (define (dup->inport fd/port . maybe-target)
-  (apply really-dup->port make-input-fdport fd/port maybe-target))
+  (apply really-dup->port make-input-fdport/fd fd/port maybe-target))
 
 (define (dup->outport fd/port . maybe-target)
   (apply really-dup->port make-output-fdport fd/port maybe-target))

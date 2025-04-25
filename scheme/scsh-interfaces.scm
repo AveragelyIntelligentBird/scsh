@@ -60,7 +60,7 @@
 	  fdport?
 	  %move-fdport
 	  close-fdes
-	  make-input-fdport
+	  make-input-fdport/fd
 	  make-output-fdport
 	  close
 	  seek/set
@@ -118,7 +118,7 @@
     buf-policy=?
     
     ; Setter for bufpol on a port
-    ;set-port-buffering
+    set-port-buffering
 ))
 
 (define-interface scsh-io-interface 

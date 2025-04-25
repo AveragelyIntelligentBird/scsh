@@ -243,6 +243,7 @@
                       open-input-file
                       open-output-file))
         scsh-channel-ports
+        debug-messages
         (subset tables (table-set!
                         table-ref
                         make-integer-table))
@@ -308,7 +309,7 @@
         byte-vectors
         session-data
         finite-types) ; Bufpol
-  (files (ports newports) (ports portmakers) (ports port-bufpol)))
+  (files (ports newports) (ports portmakers)))
 
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs

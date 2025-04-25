@@ -66,7 +66,7 @@
   (delete-fdport! (channel-os-index channel))
   (close-channel channel))
 
-(define (make-input-fdport fd revealed)
+(define (make-input-fdport/fd fd revealed)
   (let ((port (really-make-input-fdport (make-input-channel fd) bufpol/block)))
     (set-fdport! fd port revealed)
     port))
@@ -108,8 +108,8 @@
               (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
           (channel (s48-port->channel s48-port))
           (port (if (input-port? s48-port)
-                  (really-make-input-fdport channel bufpol/none) ; Block buf by default
-                  (really-make-output-fdport channel bufpol/block))))
+                  (make-input-fdport channel bufpol/block) ; Block buf by default
+                  (really-make-output-fdport channel bufpol/block 100))))
     (set-fdport! (fdport->fd port) port 0)
     port))
 
@@ -150,7 +150,7 @@
          (else (port-maker fd 1))))
 
 (define (fdes->inport fd)
-  (let ((port (fdes->port fd make-input-fdport)))
+  (let ((port (fdes->port fd make-input-fdport/fd)))
     (if (not (input-port? port))
         (error "fdes was already assigned to an outport" fd)
         port)))

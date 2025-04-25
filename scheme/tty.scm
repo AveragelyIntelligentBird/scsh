@@ -314,7 +314,7 @@
       (let ((fd (%open-control-tty ttyname flags)))
 	((if (or (file-options-on? flags (file-options read-only))
 		 (file-options-on? flags (file-options read-write)))
-	     make-input-fdport
+       make-input-fdport/fd
 	     make-output-fdport)
 	 fd 1))))
 

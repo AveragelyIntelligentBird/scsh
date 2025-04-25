@@ -63,7 +63,7 @@
 (define (open-pty)
   (let ((pty-fd.tty-name (allocate-pty)))
     (if pty-fd.tty-name
-        (values (make-input-fdport (car pty-fd.tty-name) 0)
+        (values (make-input-fdport/fd (car pty-fd.tty-name) 0)
                 (byte-vector->string (cdr pty-fd.tty-name)))
         (open-pty-from-devname))))
 
