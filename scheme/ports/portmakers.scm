@@ -8,7 +8,6 @@
                             (channel-buffer-size) 
                             (car maybe-buffer-size)))
            (bufpol (if (= 1 buffer-size) bufpol/none bufpol))) 
-    (display "I'm making input port\n")
     (cond 
         ; Errors
         ((>= 0 buffer-size) 

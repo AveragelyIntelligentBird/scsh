@@ -69,48 +69,51 @@
 ;   D. we don't want to wait
 ;       -> so we don't
 
-(define (fill-buffer! port wait?)
+(define (make-buffer-filler unbuf?)
+  (lambda (port wait?) 
   (let ((cell (port-data port))
-	(buffer (port-buffer port)))
+		(buffer (port-buffer port)))
     (let ((condvar (channel-cell-condvar cell))
-	  (channel (channel-cell-ref cell)))
-      (cond ((not (channel-cell-in-use? cell))
-	     (set-channel-cell-in-use?! cell #t)
-	     (let ((limit (provisional-port-limit port)))
-	       (channel-maybe-commit-and-read channel
-					      buffer
-					      limit
-					      (- (byte-vector-length buffer) limit)
-					      condvar
-					      wait?))
-	     #f)	; caller should retry as results may now be available
-	    ((condvar-has-value? condvar)
-	     (let ((result (condvar-value condvar)))
-	       (set-channel-cell-in-use?! cell #f)
-	       (set-condvar-has-value?! condvar #f)
-	       (note-buffer-reuse! port)
-	       (cond
-		((eof-object? result)
-		 (provisional-set-port-pending-eof?! port #t))
-		((i/o-error? result)
-		 (if (maybe-commit)
-		     (signal-condition result)
-		     #f))
+	  	  (channel (channel-cell-ref cell)))
+      (cond 
+		((not (channel-cell-in-use? cell))
+			(set-channel-cell-in-use?! cell #t)
+			(let ((limit (provisional-port-limit port)))
+				(channel-maybe-commit-and-read channel
+								buffer
+								limit
+								(if unbuf? 1 (- (byte-vector-length buffer) limit))
+								condvar
+								wait?))
+			; (debug-message "READ")  ; debugging
+			#f)	; caller should retry as results may now be available
+		((condvar-has-value? condvar)
+			(let ((result (condvar-value condvar)))
+			(set-channel-cell-in-use?! cell #f)
+			(set-condvar-has-value?! condvar #f)
+			(note-buffer-reuse! port)
+			(cond
+				((eof-object? result)
+					(provisional-set-port-pending-eof?! port #t))
+				((i/o-error? result)
+					(if (maybe-commit)
+							(signal-condition result)
+							#f))
+				(else
+					(provisional-set-port-limit! port
+						(+ (provisional-port-limit port) result))))
+			(maybe-commit)))
+		(wait?
+			(maybe-commit-and-wait-for-condvar condvar #f))
 		(else
-		 (provisional-set-port-limit! port
-					      (+ (provisional-port-limit port) result))))
-	       (maybe-commit)))
-	    (wait?
-	     (maybe-commit-and-wait-for-condvar condvar #f))
-	    (else
-	     (maybe-commit))))))
+			(maybe-commit)))))))
 
 (define buf-input-fdport-handler
   (make-buffered-input-port-handler
      (lambda (cell)
        (list 'buf-input-fdport (channel-cell-ref cell)))
      port-channel-closer
-     fill-buffer!
+     (make-buffer-filler #f)
      channel-port-ready?))
 
 ; Assuming all arguments are valid 
@@ -136,70 +139,38 @@
 ; byte at a time until we either can decode a character OR we have exhausted max char length 
 ; for a given encoding.  
 
-; One-byte-at-a-time "unbuffered" buffer filler
-; TODO - possibly abstract with fill-buffer!
-(define (fill-one-byte-buffer! port wait?)
-  (let ((cell (port-data port))
-				(buffer (port-buffer port)))
-    (let ((condvar (channel-cell-condvar cell))
-	  			(channel (channel-cell-ref cell)))
-      (cond 
-				((not (channel-cell-in-use? cell))
-					(set-channel-cell-in-use?! cell #t)
-					(let ((limit (provisional-port-limit port)))
-						(channel-maybe-commit-and-read channel
-										buffer
-										limit
-										1  ; Read up to one byte
-										condvar
-										wait?))
-					#f)	; caller should retry as results may now be available
-				((condvar-has-value? condvar)
-				 (let ((result (condvar-value condvar)))
-					(set-channel-cell-in-use?! cell #f)
-					(set-condvar-has-value?! condvar #f)
-					(note-buffer-reuse! port)
-					(cond
-						((eof-object? result)
-							(provisional-set-port-pending-eof?! port #t))
-						((i/o-error? result)
-							(if (maybe-commit)
-									(signal-condition result)
-									#f))
-						(else
-							(provisional-set-port-limit! port
-													(+ (provisional-port-limit port) result))))
-					(maybe-commit)))
-				(wait?
-					(maybe-commit-and-wait-for-condvar condvar #f))
-				(else
-					(maybe-commit))))))
-
-(define unbuf-input-fdport-handler
+(define unbuf-input-fdport-handler/block-handler
   (let* ((handler 
-						(make-buffered-input-port-handler
-							(lambda (cell)
-								(list 'unbuf-input-fdport (channel-cell-ref cell)))
-							port-channel-closer
-							fill-one-byte-buffer!
-							channel-port-ready?)))
+			(make-buffered-input-port-handler
+				(lambda (cell)
+					(list 'unbuf-input-fdport (channel-cell-ref cell)))
+				port-channel-closer
+				(make-buffer-filler #t)
+				channel-port-ready?)))
 		; Remaking the port because s48 does not define a setter for block handler :<
 		(make-port-handler 
-      (port-handler-discloser handler)
-      (port-handler-close handler) 
-      (port-handler-byte handler)
-      (port-handler-char handler)
-      ; TODO: Redefine block handler to be a direct read into given buffer
-			#f
-      (port-handler-ready? handler)
-      (port-handler-force handler))))
+			(port-handler-discloser handler)
+			(port-handler-close handler) 
+			(port-handler-byte handler)
+			(port-handler-char handler)
+			#f ; TODO: do we want to add a direct read into buffer here? or do we want to loop individual byte reads?
+			(port-handler-ready? handler)
+			(port-handler-force handler))))
+
+(define unbuf-input-fdport-handler
+  (make-buffered-input-port-handler
+	(lambda (cell)
+		(list 'unbuf-input-fdport (channel-cell-ref cell)))
+	port-channel-closer
+	(make-buffer-filler #t)
+	channel-port-ready?))
 
 (define unbuf-port-buf-size 64) ; Arbitrary small vlaue for internal buffers
 
 (define (make-unbuf-input-fdport channel closer)
 	(let ((port
 	       (make-buffered-input-port 
-						buf-input-fdport-handler
+						unbuf-input-fdport-handler
 						(make-channel-cell channel closer)
 						(make-byte-vector unbuf-port-buf-size 0) 
 						0

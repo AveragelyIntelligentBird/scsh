@@ -108,13 +108,8 @@
               (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
           (channel (s48-port->channel s48-port))
           (port (if (input-port? s48-port)
-                  (really-make-input-fdport channel bufpol/block) ; Block buf by default
+                  (really-make-input-fdport channel bufpol/none) ; Block buf by default
                   (really-make-output-fdport channel bufpol/block))))
-    (display s48-port)
-    (newline)
-    (display channel)
-    (newline)
-    (display port)
     (set-fdport! (fdport->fd port) port 0)
     port))
 
