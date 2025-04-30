@@ -14,47 +14,54 @@
 ; closing method.
 
 (define-synchronized-record-type channel-cell :channel-cell
-  (really-make-channel-cell channel closer condvar in-use?)
+  (really-make-channel-cell channel closer condvar bufpol soft-bufsize in-use?)
   (in-use? sent)
   channel-cell?
   (channel channel-cell-ref)
   (closer  channel-cell-closer)
   (condvar channel-cell-condvar)
+  (bufpol  channel-cell-bufpol  set-channel-cell-bufpol!)
+  (soft-bufsize  channel-cell-soft-bufsize  set-channel-cell-soft-bufsize!) ; user specified buffer size
   (in-use? channel-cell-in-use? set-channel-cell-in-use?!)
   (sent    channel-cell-sent    set-channel-cell-sent!))
 
-(define (make-channel-cell channel closer)
-  (really-make-channel-cell channel closer (make-condvar) #f))
+(define (make-channel-cell channel closer bufpol bufsize)
+  (really-make-channel-cell channel closer (make-condvar) bufpol bufsize #f))
 
-; TODO: getter and setter for bufpol
 ; TODO: transfer all lookup table stuff here
-; TODO add bufpol into the struct
 
-; Extracting the channel from a port.
+; Extracting bufpol from fdport
+(define (fdport->bufpol port)
+  (let ((data (port-data port)))
+    (if (channel-cell? data)
+	(channel-cell-bufpol data)
+	#f)))
 
+; Extracting the channel from fdport
 (define (fdport->channel port)
   (let ((data (port-data port)))
     (if (channel-cell? data)
 	(channel-cell-ref data)
 	#f)))
 
+; Extracting the fd from fdport
 (define (fdport->fd port)
   (let ((channel (fdport->channel port)))
     (if channel
-				(channel-os-index channel)
-				#f)))
+		(channel-os-index channel)
+		#f)))
 
 ; Closing a port's channel.  This is called with a proposal already in place.
 
 (define (port-channel-closer cell)
   (channel-maybe-commit-and-close (channel-cell-ref cell)
-				  (channel-cell-closer cell)))
+		(channel-cell-closer cell)))
 
 (define (channel-port-ready? port)
   (let ((ready? (channel-ready? (channel-cell-ref (port-data port)))))
     (if (maybe-commit)
-				(values #t ready?)
-				(values #f #f))))
+		(values #t ready?)
+		(values #f #f))))
 
 ;----------------
 ; Block-buffered Input Ports
@@ -69,11 +76,12 @@
 ;   D. we don't want to wait
 ;       -> so we don't
 
-(define (make-buffer-filler unbuf?)
-  (lambda (port wait?) 
+(define (bufpol-buffer-filler port wait?) 
   (let ((cell (port-data port))
 		(buffer (port-buffer port)))
-    (let ((condvar (channel-cell-condvar cell))
+    (let ((unbuf? (buf-policy=? (channel-cell-bufpol cell) bufpol/none))
+		  (soft-bufsize (channel-cell-soft-bufsize cell))
+		  (condvar (channel-cell-condvar cell))
 	  	  (channel (channel-cell-ref cell)))
       (cond 
 		((not (channel-cell-in-use? cell))
@@ -82,10 +90,10 @@
 				(channel-maybe-commit-and-read channel
 								buffer
 								limit
-								(if unbuf? 1 (- (byte-vector-length buffer) limit))
+								(if unbuf? 1 (- soft-bufsize limit))
 								condvar
 								wait?))
-			; (debug-message "READ")  ; debugging
+			(debug-message "READ")  ; debugging
 			#f)	; caller should retry as results may now be available
 		((condvar-has-value? condvar)
 			(let ((result (condvar-value condvar)))
@@ -106,25 +114,28 @@
 		(wait?
 			(maybe-commit-and-wait-for-condvar condvar #f))
 		(else
-			(maybe-commit)))))))
+			(maybe-commit))))))
 
-(define buf-input-fdport-handler
+(define bufpol-input-fdport-handler
   (make-buffered-input-port-handler
      (lambda (cell)
-       (list 'blockbuf-input-fdport (channel-cell-ref cell)))
+       (list 'input-fdport
+	   		 'bufpol: (channel-cell-bufpol cell) 
+	   		 'bufsize: (channel-cell-soft-bufsize cell) 
+			 'os-path: (channel-id (channel-cell-ref cell))))
      port-channel-closer
-     (make-buffer-filler #f)
+     bufpol-buffer-filler
      channel-port-ready?))
 
 ; Assuming all arguments are valid 
 (define (make-blockbuf-input-fdport channel buffer-size closer)
 	(let ((port
 	       (make-buffered-input-port 
-						buf-input-fdport-handler
-						(make-channel-cell channel closer)
-						(make-byte-vector buffer-size 0)
-						0
-						0)))
+				bufpol-input-fdport-handler
+				(make-channel-cell channel closer bufpol/block buffer-size)
+				(make-byte-vector (channel-buffer-size)  0)
+				0
+				0)))
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
@@ -139,45 +150,45 @@
 ; byte at a time until we either can decode a character OR we have exhausted max char length 
 ; for a given encoding.  
 
-(define unbuf-input-fdport-handler/block-handler
-  (let* ((handler 
-			(make-buffered-input-port-handler
-				(lambda (cell)
-					(list 'unbuf-input-fdport (channel-cell-ref cell)))
-				port-channel-closer
-				(make-buffer-filler #t)
-				channel-port-ready?)))
-		; Remaking the port because s48 does not define a setter for block handler :<
-		(make-port-handler 
-			(port-handler-discloser handler)
-			(port-handler-close handler) 
-			(port-handler-byte handler)
-			(port-handler-char handler)
-			#f ; TODO: do we want to add a direct read into buffer here? or do we want to loop individual byte reads?
-			(port-handler-ready? handler)
-			(port-handler-force handler))))
+; (define unbuf-input-fdport-handler/block-handler
+;   (let* ((handler 
+; 			(make-buffered-input-port-handler
+; 				(lambda (cell)
+; 					(list 'unbuf-input-fdport (channel-cell-ref cell)))
+; 				port-channel-closer
+; 				(make-buffer-filler #t)
+; 				channel-port-ready?)))
+; 		; Remaking the port because s48 does not define a setter for block handler :<
+; 		(make-port-handler 
+; 			(port-handler-discloser handler)
+; 			(port-handler-close handler) 
+; 			(port-handler-byte handler)
+; 			(port-handler-char handler)
+; 			#f ; TODO: do we want to add a direct read into buffer here? or do we want to loop individual byte reads?
+; 			(port-handler-ready? handler)
+; 			(port-handler-force handler))))
 
-(define unbuf-input-fdport-handler
-  (make-buffered-input-port-handler
-	(lambda (cell)
-		(list 'unbuf-input-fdport (channel-cell-ref cell)))
-	port-channel-closer
-	(make-buffer-filler #t)
-	channel-port-ready?))
-
-(define unbuf-port-buf-size 64) ; Arbitrary small vlaue for internal buffers
+(define unbuf-port-buf-size 64) ; Arbitrary small vlaue for unbuffered buffers
 
 (define (make-unbuf-input-fdport channel closer)
 	(let ((port
 	       (make-buffered-input-port 
-						unbuf-input-fdport-handler
-						(make-channel-cell channel closer)
-						(make-byte-vector unbuf-port-buf-size 0) 
-						0
-						0)))
+		   		bufpol-input-fdport-handler
+				(make-channel-cell channel closer bufpol/none unbuf-port-buf-size)
+				(make-byte-vector (channel-buffer-size) 0) 
+				0
+				0)))
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
+
+(define (set-fdport-for-bufpol port bufpol bufsize)
+	(let ((cell (port-data port)))
+		(set-channel-cell-bufpol! cell bufpol)
+		(set-channel-cell-soft-bufsize! cell bufsize)
+		(set-port-index! port 0)
+		(set-port-limit! port 0)
+))
 
 ;----------------
 ; Buffered Output ports
@@ -331,6 +342,8 @@
 
 (define (channel-buffer-size)
   (channel-parameter (enum channel-parameter-option buffer-size)))
+
+(define max-soft-bufsize (channel-buffer-size))
 
 (define (channel-crlf?)
   (channel-parameter (enum channel-parameter-option crlf?)))

@@ -210,6 +210,11 @@
         (subset external-calls (import-lambda-definition-2)))
   (files process-state))
 
+(define-structure scsh-bufpol scsh-bufpol-interface
+  (open scheme-level-1
+        finite-types)
+  (files (ports bufpol))
+)
 
 (define-structure scsh-channel-ports scsh-channel-ports-interface
   (open scheme-level-1 byte-vectors define-record-types ascii
@@ -224,6 +229,7 @@
     (subset primitives      (channel-parameter))
     handle
     debug-messages		; for error messages
+    scsh-bufpol
     (subset util		(unspecific))
     (subset primitives	(add-finalizer! os-error-message)))
   (files (ports channel-port)))
@@ -243,6 +249,7 @@
                       open-input-file
                       open-output-file))
         scsh-channel-ports
+        scsh-bufpol
         debug-messages
         (subset tables (table-set!
                         table-ref

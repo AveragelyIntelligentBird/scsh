@@ -49,12 +49,17 @@
     make-linebuf-output-fdport
     make-unbuf-output-fdport
 
-    channel-buffer-size
+    max-soft-bufsize
+
+    set-fdport-for-bufpol
   ))	
 
 (define-interface scsh-newports-interface
   (export 
-  make-output-fdport ; TODO - remove
+    make-output-fdport ; TODO - remove
+    ; Setter for bufpol on a port
+    set-port-buffering
+
     call/fdes
 	  sleazy-call/fdes
 	  fdes->inport
@@ -121,9 +126,6 @@
     
     ; Bufpol equality
     buf-policy=?
-    
-    ; Setter for bufpol on a port
-    set-port-buffering
 ))
 
 (define-interface scsh-io-interface 
@@ -153,6 +155,7 @@
           write-char
           sanity-write-char
           sanity-write-string
+          set-port-buffering
           display
           newline
           input-port?

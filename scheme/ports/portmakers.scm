@@ -3,30 +3,11 @@
 ; Any extensions, such as port reveal count and bufpol, are managed by scsh's lookup
 ; table, as can be seen in newports.scm
 
-;; Enum, represeting possile buffering policies
-(define-enumerated-type buf-policy :buf-policy
-  buf-policy?				; predicate
-  buf-policies          ; vector containing all elements
-  buf-policy-name			; name accessor
-  buf-policy-index			; index accessor
-  ( 
-    block   ; General block buffering (general default)
-    line    ; Line buffering (tty default) 
-    none    ; Direct I/O -- no buffering
-  ))
-
-(define bufpol/block (buf-policy block))
-(define bufpol/line (buf-policy line))
-(define bufpol/none (buf-policy none))
-
-(define (buf-policy=? p1 p2)
-  (= (buf-policy-index p1) (buf-policy-index p2)))
-
 ;; Actual fdport makers
 
 (define (make-input-fdport channel . maybe-buffer-size)
   (let ((buffer-size (if (null? maybe-buffer-size) 
-                         (channel-buffer-size) 
+                         max-soft-bufsize 
                          (car maybe-buffer-size))))
   (really-make-input-fdport channel bufpol/block buffer-size))) ; Block buffering default
 
@@ -56,14 +37,14 @@
 
 (define (make-output-fdport channel . maybe-buffer-size)
   (let ((buffer-size (if (null? maybe-buffer-size) 
-                         (channel-buffer-size) 
+                         max-soft-bufsize 
                          (car maybe-buffer-size))))
   (really-make-output-fdport channel bufpol/block buffer-size))) ; Block buffering default
 
 ; TODO - remove, this is just for testing
 (define (make-output-fdport/bufpol channel bufpol . maybe-buffer-size)
   (let ((buffer-size (if (null? maybe-buffer-size) 
-                         (channel-buffer-size) 
+                         max-soft-bufsize 
                          (car maybe-buffer-size))))
   (really-make-output-fdport channel bufpol buffer-size)))
           
@@ -91,24 +72,32 @@
         (make-unbuf-output-fdport channel close-fdport-channel)))))
 
 
-; Since a different buffering policy implies a different set of handler, we make a 
-; new port from scratch on the same channel + set text codec
-(define (set-port-buffering port policy . maybe-buffer-size)
+; Since we cannot set a handler on an existing port, we will set the 
+; bufpol data field and have the handlers always check that 
+(define (set-port-buffering port bufpol . maybe-buffer-size)
   (check-arg fdport? port set-port-buffering)
-  (check-arg buf-policy? policy set-port-buffering)
+  (check-arg buf-policy? bufpol set-port-buffering)
   ; TODO: address non-empty buffer case. Restrict altogether? warn that will be lost? flush for outport, ignore for inports?
-    ; (flush-fdport port)
-  (let* ((channel (fdport->channel port))
+  ; (flush-fdport port)
+  (let* ((input? (input-port? port))
          (buffer-size (if (null? maybe-buffer-size) 
-                          (channel-buffer-size) 
+                          max-soft-bufsize 
                           (car maybe-buffer-size)))
-         (new-port (if (input-port? port)
-                        (really-make-input-fdport channel policy buffer-size)
-                        (really-make-output-fdport channel policy buffer-size)))
-         (cur-port-fd (fdport->fd port))
-         (cur-port-revealed-count (maybe-ref-fdport-revealed cur-port-fd)))
-    (set-port-text-codec! new-port (port-text-codec port)) 
-    (set-fdport! cur-port-fd new-port cur-port-revealed-count)
-    (set! port new-port))) 
-    ; This will not work nor can we set the handler 
-    ; -- meaning the handlers needs to hook into the struct and decide on which handler to use?
+         (bufpol (cond ((and input? (= 1 buffer-size)) bufpol/none)
+                       ((and (not input?) (= 0 buffer-size)) bufpol/none)
+                       ( else bufpol))))               
+    (cond 
+      ; Errors
+      ((or (not (integer? buffer-size)) 
+           (and input? (>= 0 buffer-size))
+           (and (not input?) (> 0 buffer-size)))
+          (assertion-violation 'set-port-buffering
+            "invalid buffer size for the given bufpol"
+            set-port-buffering bufpol buffer-size))
+      ((and input? (buf-policy=? bufpol bufpol/line))
+          (assertion-violation 'set-port-buffering
+            "cannot set line buffering on input ports"
+            set-port-buffering port bufpol))
+      (input? (set-fdport-for-bufpol port bufpol buffer-size))
+      (else 
+        (assertion-violation 'set-port-buffering "TODO: implement me"))))) 
