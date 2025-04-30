@@ -63,6 +63,13 @@
 		(values #t ready?)
 		(values #f #f))))
 
+(define (reset-fdport-for-bufpol port bufpol bufsize)
+	(let ((cell (port-data port)))
+		(set-channel-cell-bufpol! cell bufpol)
+		(set-channel-cell-soft-bufsize! cell bufsize)
+		(set-port-index! port 0)
+		(set-port-limit! port 0)))
+
 ;----------------
 ; Block-buffered Input Ports
 
@@ -116,7 +123,117 @@
 		(else
 			(maybe-commit))))))
 
-(define bufpol-input-fdport-handler
+;;; Needed altering for soft bufsize check
+; The MODE argument says whether we're doing a READ (#f) , a PEEK (#t),
+; or a CHAR-READY? ( () )
+(define cr (ascii->char 13))
+(define (make-one-char-input buffer-filler!)
+  (lambda (port mode)
+    (let ((decode
+	   (text-codec-decode-char-proc (port-text-codec port))))
+      (with-new-proposal (lose)
+
+	(let ((limit (provisional-port-limit port)))
+	  (let loop ((index (provisional-port-index port)))
+	  
+	    (define (consume&deliver decode-count val)
+	      (if (not mode)
+		  (provisional-set-port-index! port
+					       (+ index decode-count)))
+	      (if (maybe-commit)
+		  val
+		  (lose)))
+
+	    (cond ((not (open-input-port? port))
+		   (remove-current-proposal!)
+		   (assertion-violation (cond
+					 ((not mode) 'read-char)
+					 ((null? mode) 'char-ready?)
+					 (else 'peek-char))
+					"invalid argument"
+					port))
+		  ((< index limit)
+		   (let ((buffer (port-buffer port)))
+		     (call-with-values
+			 (lambda ()
+			   (decode buffer index (- limit index)))
+		       (lambda (ch decode-count)
+			 (cond
+			  (ch
+			    ;; CR/LF handling. Great.
+			   (cond
+			    ((port-crlf? port)
+			     (cond
+			      ((char=? ch cr)
+			       (provisional-set-port-pending-cr?! port #t)
+			       (consume&deliver decode-count
+						(if (null? mode) ; CHAR-READY?
+						    #t
+						    #\newline)))
+			      ((and (char=? ch #\newline)
+				    (provisional-port-pending-cr? port))
+			       (provisional-set-port-pending-cr?! port #f)
+			       (loop (+ index decode-count)))
+			      (else
+			       (provisional-set-port-pending-cr?! port #f)
+			       (consume&deliver decode-count
+						(if (null? mode) ; CHAR-READY?
+						    #t
+						    ch)))))
+			    (else
+			     (provisional-set-port-pending-cr?! port #f)
+			     (consume&deliver decode-count
+					      (if (null? mode) ; CHAR-READY?
+						  #t
+						  ch)))))
+			     
+			  ((or (not decode-count) ; decoding error
+			       (provisional-port-pending-eof? port)) ; partial char
+			   (consume&deliver 1
+					    (if (null? mode)
+						#t
+						#\?)))
+			  ;; need at least DECODE-COUNT bytes
+			  (else
+			   (if (> decode-count
+				  (- (channel-cell-soft-bufsize (port-data port))
+				     limit))
+			      
+			       ;; copy what we have to the
+			       ;; beginning so there's space at the
+			       ;; end we can try to fill
+			       (begin
+				 ;; (debug-message "aligning port buffer")
+				 (attempt-copy-bytes! buffer index
+						      buffer 0
+						      (- limit index))
+				 (provisional-set-port-index! port 0)
+				 (provisional-set-port-limit! port (- limit index))))
+			   (if (or (not (buffer-filler! port (not (null? mode))))
+				   (not (null? mode)))
+			       (lose)
+			       #f)))))))
+		  ((provisional-port-pending-eof? port)
+		   (if (not mode)
+		       (provisional-set-port-pending-eof?! port #f))
+		   (cond
+		    ((not (maybe-commit))
+		     (lose))
+		    ((null? mode) #t)
+		    (else (eof-object))))
+		  (else
+		   (if (= index limit)	; we have zilch
+		       (begin
+			 (provisional-set-port-index! port 0)
+			 (provisional-set-port-limit! port 0))
+		       ;; may be out of synch because of CR/LF conversion
+		       (provisional-set-port-index! port index))
+		   (if (or (not (buffer-filler! port (not (null? mode))))
+			   (not (null? mode)))
+		       (lose)
+		       #f)))))))))
+			
+(define bufpol-input-fdport-handler/old
   (make-buffered-input-port-handler
      (lambda (cell)
        (list 'input-fdport
@@ -126,6 +243,63 @@
      port-channel-closer
      bufpol-buffer-filler
      channel-port-ready?))
+
+; (define (channel-read channel buffer start count wait?)
+;   (let ((ints (disable-interrupts!)))
+;     (let ((res (channel-maybe-read channel buffer start count wait?)))
+;       (if res
+; 	  (begin
+; 	    (set-enabled-interrupts! ints)
+; 	    res)
+; 	  (let ((condvar (make-condvar)))
+; 	    (add-channel-condvar! channel condvar)
+;             (with-new-proposal (lose)
+;               (or (maybe-commit-and-wait-for-condvar condvar #f)
+;                   (lose)))
+; 	    (set-enabled-interrupts! ints)
+; 	    (condvar-value condvar))))))
+
+; (define unbuf-read-block-handler
+;   (lambda (port buffer start count wait?)
+;     (let loop ((have 0))
+;       (let* ((channel (port-data port))
+; 			 (soft-bufsize (channel-cell-soft-bufsize channel))
+;              (have (+ have
+; 					(channel-read 
+; 						channel
+; 						buffer
+; 						(+ start have)
+; 						(- count have)
+; 						wait?))))
+; 	(if (< have count)
+; 	    (loop have))))))
+
+(define bufpol-input-fdport-handler
+  (let ((handler 
+			(make-buffered-input-port-handler
+				(lambda (cell)
+				(list 'input-fdport
+						'bufpol: (channel-cell-bufpol cell) 
+						'bufsize: (channel-cell-soft-bufsize cell) 
+						'os-path: (channel-id (channel-cell-ref cell))))
+				port-channel-closer
+				bufpol-buffer-filler
+				channel-port-ready?)))
+		; Remaking the port because s48 does not define a setter for block handler :<
+		(make-port-handler 
+			(port-handler-discloser handler)
+			(port-handler-close handler) 
+			(port-handler-byte handler)
+			; A bit chaned char handler that is soft-bufsize aware
+			(make-one-char-input bufpol-buffer-filler)
+			; If it is unbuffered, read directly into a given buffer
+			(lambda (port buffer start count wait?)
+				(if (not (buf-policy=? (channel-cell-bufpol (port-data port)) bufpol/none))
+					((port-handler-block handler) port buffer start count wait?)
+					#f ;unbuf-read-block-handler
+				))
+			(port-handler-ready? handler)
+			(port-handler-force handler))))
 
 ; Assuming all arguments are valid 
 (define (make-blockbuf-input-fdport channel buffer-size closer)
@@ -150,24 +324,6 @@
 ; byte at a time until we either can decode a character OR we have exhausted max char length 
 ; for a given encoding.  
 
-; (define unbuf-input-fdport-handler/block-handler
-;   (let* ((handler 
-; 			(make-buffered-input-port-handler
-; 				(lambda (cell)
-; 					(list 'unbuf-input-fdport (channel-cell-ref cell)))
-; 				port-channel-closer
-; 				(make-buffer-filler #t)
-; 				channel-port-ready?)))
-; 		; Remaking the port because s48 does not define a setter for block handler :<
-; 		(make-port-handler 
-; 			(port-handler-discloser handler)
-; 			(port-handler-close handler) 
-; 			(port-handler-byte handler)
-; 			(port-handler-char handler)
-; 			#f ; TODO: do we want to add a direct read into buffer here? or do we want to loop individual byte reads?
-; 			(port-handler-ready? handler)
-; 			(port-handler-force handler))))
-
 (define unbuf-port-buf-size 64) ; Arbitrary small vlaue for unbuffered buffers
 
 (define (make-unbuf-input-fdport channel closer)
@@ -181,14 +337,6 @@
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
-
-(define (set-fdport-for-bufpol port bufpol bufsize)
-	(let ((cell (port-data port)))
-		(set-channel-cell-bufpol! cell bufpol)
-		(set-channel-cell-soft-bufsize! cell bufsize)
-		(set-port-index! port 0)
-		(set-port-limit! port 0)
-))
 
 ;----------------
 ; Buffered Output ports

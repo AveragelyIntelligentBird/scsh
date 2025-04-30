@@ -51,7 +51,7 @@
 
     max-soft-bufsize
 
-    set-fdport-for-bufpol
+    reset-fdport-for-bufpol
   ))	
 
 (define-interface scsh-newports-interface

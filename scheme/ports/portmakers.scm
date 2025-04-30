@@ -98,6 +98,6 @@
           (assertion-violation 'set-port-buffering
             "cannot set line buffering on input ports"
             set-port-buffering port bufpol))
-      (input? (set-fdport-for-bufpol port bufpol buffer-size))
+      (input? (reset-fdport-for-bufpol port bufpol buffer-size))
       (else 
         (assertion-violation 'set-port-buffering "TODO: implement me"))))) 
