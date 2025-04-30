@@ -42,15 +42,10 @@
     fdport->channel
     fdport->fd
 
-    make-blockbuf-input-fdport
-    make-unbuf-input-fdport
-
-    make-blockbuf-output-fdport
-    make-linebuf-output-fdport
-    make-unbuf-output-fdport
+    construct-input-fdport
+    construct-output-fdport
 
     max-soft-bufsize
-
     reset-fdport-for-bufpol
   ))	
 

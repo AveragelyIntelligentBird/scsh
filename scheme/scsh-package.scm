@@ -221,6 +221,7 @@
     ports
     i/o i/o-internal text-codecs
     channels channel-i/o
+    (subset threads-internal (maybe-commit-no-interrupts))
     os-strings
     proposals
     condvars
@@ -251,6 +252,7 @@
         scsh-channel-ports
         scsh-bufpol
         debug-messages
+        (subset util		(unspecific))
         (subset tables (table-set!
                         table-ref
                         make-integer-table))

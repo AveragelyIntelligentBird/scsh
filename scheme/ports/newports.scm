@@ -108,7 +108,7 @@
           (channel (s48-port->channel s48-port))
           (port (if (input-port? s48-port)
                   (make-input-fdport channel)
-                  (make-output-fdport/bufpol channel bufpol/line))))
+                  (make-output-fdport channel))))
     (set-fdport! (fdport->fd port) port 0)
     port))
 
@@ -345,7 +345,8 @@
 
 ; TODO replace the faulty write chars with an actually correct thing wat
 (define (sanity-write-char char port) 
-  ((port-handler-char (port-handler port)) port char))
+  ((port-handler-char (port-handler port)) port char)
+  (unspecific))
 
 (define (sanity-write-string string port) 
   (let ((write-ch (port-handler-char (port-handler port)))

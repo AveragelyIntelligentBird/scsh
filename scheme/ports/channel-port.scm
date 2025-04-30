@@ -63,17 +63,24 @@
 		(values #t ready?)
 		(values #f #f))))
 
-(define (reset-fdport-for-bufpol port bufpol bufsize)
+(define (reset-fdport-for-bufpol port bufpol bufsize input?)
 	(let ((cell (port-data port)))
 		(set-channel-cell-bufpol! cell bufpol)
 		(set-channel-cell-soft-bufsize! cell bufsize)
 		(set-port-index! port 0)
-		(set-port-limit! port 0)))
+		(set-port-limit! port (if input? 0 (channel-buffer-size)))))
 
-;----------------
-; Block-buffered Input Ports
+;----------
+; Input ports
 
-; Four possibilities:
+; An unbuffered read reads (or attempts to read) excatly the number of bytes
+; requested in a single syscall. This behavior is straighforward for reading byte
+; streams, but it gets significantly more involved if we want to read variable-length
+; char encodings one character at a time. To approximate the behavior, we will read one 
+; byte at a time until we either can decode a character OR we have exhausted max char length 
+; for a given encoding.  
+
+; Buffer filler for input ports has four states:
 ;   A. there is no read in progress
 ;       -> initiate a read
 ;   B. a read has completed
@@ -233,46 +240,7 @@
 		       (lose)
 		       #f)))))))))
 			
-(define bufpol-input-fdport-handler/old
-  (make-buffered-input-port-handler
-     (lambda (cell)
-       (list 'input-fdport
-	   		 'bufpol: (channel-cell-bufpol cell) 
-	   		 'bufsize: (channel-cell-soft-bufsize cell) 
-			 'os-path: (channel-id (channel-cell-ref cell))))
-     port-channel-closer
-     bufpol-buffer-filler
-     channel-port-ready?))
 
-; (define (channel-read channel buffer start count wait?)
-;   (let ((ints (disable-interrupts!)))
-;     (let ((res (channel-maybe-read channel buffer start count wait?)))
-;       (if res
-; 	  (begin
-; 	    (set-enabled-interrupts! ints)
-; 	    res)
-; 	  (let ((condvar (make-condvar)))
-; 	    (add-channel-condvar! channel condvar)
-;             (with-new-proposal (lose)
-;               (or (maybe-commit-and-wait-for-condvar condvar #f)
-;                   (lose)))
-; 	    (set-enabled-interrupts! ints)
-; 	    (condvar-value condvar))))))
-
-; (define unbuf-read-block-handler
-;   (lambda (port buffer start count wait?)
-;     (let loop ((have 0))
-;       (let* ((channel (port-data port))
-; 			 (soft-bufsize (channel-cell-soft-bufsize channel))
-;              (have (+ have
-; 					(channel-read 
-; 						channel
-; 						buffer
-; 						(+ start have)
-; 						(- count have)
-; 						wait?))))
-; 	(if (< have count)
-; 	    (loop have))))))
 
 (define bufpol-input-fdport-handler
   (let ((handler 
@@ -285,53 +253,28 @@
 				port-channel-closer
 				bufpol-buffer-filler
 				channel-port-ready?)))
-		; Remaking the port because s48 does not define a setter for block handler :<
+		; Remaking the port because s48 does not define a setter for char handler :<
 		(make-port-handler 
 			(port-handler-discloser handler)
 			(port-handler-close handler) 
 			(port-handler-byte handler)
 			; A bit chaned char handler that is soft-bufsize aware
 			(make-one-char-input bufpol-buffer-filler)
-			; If it is unbuffered, read directly into a given buffer
-			(lambda (port buffer start count wait?)
-				(if (not (buf-policy=? (channel-cell-bufpol (port-data port)) bufpol/none))
-					((port-handler-block handler) port buffer start count wait?)
-					#f ;unbuf-read-block-handler
-				))
+			(port-handler-block handler) 
 			(port-handler-ready? handler)
 			(port-handler-force handler))))
 
 ; Assuming all arguments are valid 
-(define (make-blockbuf-input-fdport channel buffer-size closer)
-	(let ((port
-	       (make-buffered-input-port 
-				bufpol-input-fdport-handler
-				(make-channel-cell channel closer bufpol/block buffer-size)
-				(make-byte-vector (channel-buffer-size)  0)
-				0
-				0)))
-	(set-port-crlf?! port (channel-crlf?))
-	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
-	port))
-
-;----------
-; Unbuffered Input ports
-
-; An unbuffered read reads (or attempts to read) excatly the number of bytes
-; requested in a single syscall. This behavior is straighforward for reading byte
-; streams, but it gets significantly more involved if we want to read variable-length
-; char encodings one character at a time. To approximate the behavior, we will read one 
-; byte at a time until we either can decode a character OR we have exhausted max char length 
-; for a given encoding.  
-
 (define unbuf-port-buf-size 64) ; Arbitrary small vlaue for unbuffered buffers
-
-(define (make-unbuf-input-fdport channel closer)
-	(let ((port
-	       (make-buffered-input-port 
-		   		bufpol-input-fdport-handler
-				(make-channel-cell channel closer bufpol/none unbuf-port-buf-size)
-				(make-byte-vector (channel-buffer-size) 0) 
+(define (construct-input-fdport channel bufpol buffer-size closer)
+	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
+						unbuf-port-buf-size
+						buffer-size))
+		   (port
+			(make-buffered-input-port 
+				bufpol-input-fdport-handler
+				(make-channel-cell channel closer bufpol bufsize)
+				(make-byte-vector (channel-buffer-size)  0)
 				0
 				0)))
 	(set-port-crlf?! port (channel-crlf?))
@@ -397,94 +340,232 @@
 (define (send-some port sent wait?)
   (let ((cell (port-data port)))
     (set-channel-cell-sent! cell sent)
-    (channel-maybe-commit-and-write (channel-cell-ref cell)
-				    (port-buffer port)
-				    sent
-				    (- (provisional-port-index port) sent)
-				    (channel-cell-condvar cell)
-				    wait?)))
+    (channel-maybe-commit-and-write 
+		(channel-cell-ref cell)
+		(port-buffer port)
+		sent
+		(- (provisional-port-index port) sent)
+		(channel-cell-condvar cell)
+		wait?)))
 
-(define blockbuf-output-fdport-handler
-  (make-buffered-output-port-handler
-     (lambda (cell)
-       (list 'blockbuf-output-fdport (channel-cell-ref cell)))
-     port-channel-closer
-     empty-buffer!
-     channel-port-ready?))
+;
+(define set-port-flushed! set-port-pending-eof?!)
+(define (call-to-flush! port thunk)
+  (set-port-flushed! port 'flushing) ; don't let the periodic flusher go crazy
+  (thunk)
+  (set-port-flushed! port #t))
 
-(define (make-blockbuf-output-fdport channel buffer-size closer)
-	(let ((port
-	       (make-buffered-output-port 
-				blockbuf-output-fdport-handler
-				(make-channel-cell channel closer)
-				(make-byte-vector buffer-size 0)
-				0
-				buffer-size)))
-	; (periodically-force-output! port) ; TODO do we want to enable this at all in scsh? maybe bufpol/auto?
-	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
-	(set-port-crlf?! port (channel-crlf?))
-	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
-	port))
 
-(define linebuf-output-fdport-handler
-  (let* ((handler 
+(define (make-one-byte-output buffer-emptier!)
+  (lambda (port byte)
+    (with-new-proposal (lose)
+      (let ((index (provisional-port-index port))
+	  		(limit (channel-cell-soft-bufsize (port-data port))))
+	(cond ((not (open-output-port? port))
+	       (remove-current-proposal!)
+	       (assertion-violation 'write-byte "invalid argument" port))
+	      ((< index limit)
+	       (provisional-byte-vector-set! (port-buffer port)
+					     index
+					     byte)
+	       (provisional-set-port-index! port (+ 1 index))
+	       (or (maybe-commit)
+		   (lose)))
+	      (else
+	       (call-to-flush! port (lambda () (buffer-emptier! port #t)))
+	       (lose)))))))
+
+(define (make-one-char-output buffer-emptier!)
+  (lambda (port ch)
+    (let ((encode
+	   (text-codec-encode-char-proc (port-text-codec port))))
+      (with-new-proposal (lose)
+	(let ((index (provisional-port-index port))
+	      (limit (channel-cell-soft-bufsize (port-data port))))
+	  (cond ((not (open-output-port? port))
+		 (remove-current-proposal!)
+		 (assertion-violation 'write-byte "invalid argument" port))
+		((< index limit)
+		 (let ((encode-count #f)
+		       (ok? #f))
+		   (cond
+		    ((not
+		      (maybe-commit-no-interrupts
+		       (lambda ()
+			 (if (and (port-crlf? port)
+				  (char=? ch #\newline))
+			     ;; CR/LF handling ruins our day once again
+			     (call-with-values
+				 (lambda ()
+				   (encode cr
+					   (port-buffer port)
+					   index (- limit index)))
+			       (lambda (the-ok? cr-encode-count)
+				 (cond
+				  ((or (not the-ok?)
+				       (>= (+ index cr-encode-count) limit))
+				   (set! ok? #f)
+			   (set! encode-count (+ 1 cr-encode-count))) ; LF will take at least one
+				  (else
+				   (call-with-values
+				       (lambda ()
+					 (encode #\newline
+						 (port-buffer port)
+						 (+ index cr-encode-count)
+						 (- limit (+ index cr-encode-count))))
+				     (lambda (the-ok? lf-encode-count)
+				       (set! ok? the-ok?)
+				       (if the-ok?
+					   (set-port-index! port
+							    (+ index
+							       cr-encode-count lf-encode-count))
+					   (set! encode-count (+ cr-encode-count lf-encode-count)))))))))
+			     (call-with-values
+				 (lambda ()
+				   (encode ch
+					   (port-buffer port)
+					   index (- limit index)))
+			       (lambda (the-ok? the-encode-count)
+				 (set! ok? the-ok?)
+				 (if the-ok?
+				     (set-port-index! port (+ index the-encode-count))
+				     (set! encode-count the-encode-count))))))))
+		     (lose))
+		    (ok?)		; we're done
+		    (encode-count	; need more space
+		     (with-new-proposal (_)
+		       (call-to-flush! port (lambda () (buffer-emptier! port #t))))
+		     (lose))
+		    (else		; encoding error
+		     (set! ch #\?)    ; if we get an encoding error on
+					; the second go, we're toast
+		     (lose)))))
+		(else
+		 (call-to-flush! port (lambda () (buffer-emptier! port #t)))
+		 (lose))))))))
+
+; We have the following possibilities:
+;  - the port is no longer open
+;       -> raise an error
+;  - there is nothing to write
+;       -> do nothing
+;  - there is room left in the port's buffer
+;       -> copy bytes into it
+;  - there is no room left in the port's buffer
+;       -> write it out and try again
+
+(define (make-write-block buffer-emptier!)
+  (lambda (port buffer start count)
+    (let loop ((sent 0))
+      (with-new-proposal (lose)
+	(cond ((not (open-output-port? port))
+	       (remove-current-proposal!)
+	       (assertion-violation 'write-block "invalid argument"
+				    buffer start count port))
+	      ((= count 0)
+	       (if (maybe-commit)
+		   0
+		   (lose)))
+	      ((copy-bytes-out! buffer
+				(+ start sent)
+				(- count sent)
+				port)
+	       => (lambda (more)
+		    (if (maybe-commit)
+			(let ((sent (+ sent more)))
+			  (if (< sent count)
+			      (loop sent)))
+			(lose))))
+	      (else
+	       (call-to-flush! port (lambda () (buffer-emptier! port #t)))
+	       (lose)))))))
+
+(define (copy-bytes-out! buffer start count port)
+  (let ((index (provisional-port-index port))
+  		(limit (channel-cell-soft-bufsize (port-data port))))
+    (if (< index limit)
+	(let ((copy-count (min (- limit index)
+			       count)))
+	  (check-buffer-timestamp! port)	; makes the proposal check this
+	  (provisional-set-port-index! port (+ index copy-count))
+	  (attempt-copy-bytes! buffer start
+			       (port-buffer port) index
+			       copy-count)
+	  copy-count)
+	#f)))
+
+
+;
+
+(define bufpol-output-fdport-handler
+  (let ((buf-handler ; use for discloser, closer, ready-char and forcer
 			(make-buffered-output-port-handler
 				(lambda (cell)
-					(list 'linebuf-output-fdport (channel-cell-ref cell)))
+				  (list 'output-fdport
+						'bufpol:  (channel-cell-bufpol cell) 
+						'bufsize: (channel-cell-soft-bufsize cell) 
+						'os-path: (channel-id (channel-cell-ref cell))))
 				port-channel-closer
 				empty-buffer!
 				channel-port-ready?))
-         (char-handler (port-handler-char handler)))
-		; Remaking the port because s48 does not define a setter for handlers :<
+		(unbuf-handler ; use for write handlers for unbuffered bufpol
+			(make-unbuffered-output-port-handler 
+				(lambda (port) (list 'dummy))     ; discloser
+				(lambda (port) (list 'dummy))     ; closer
+				(lambda (port buffer start count) ; write-block
+					(channel-write (channel-cell-ref (port-data port)) buffer start count))
+				(lambda (port)			          ; ready
+					(channel-ready? (channel-cell-ref (port-data port))))))
+		; remade buffered writehandlers that are aware of soft bufsize 
+		(buf-byte-handler (make-one-byte-output empty-buffer!))
+		(buf-char-handler (make-one-char-output empty-buffer!))
+		(buf-block-handler (make-write-block empty-buffer!)))
+		; Remaking the port because s48 does not define a setter for char handler :<
 		(make-port-handler 
-			(port-handler-discloser handler)
-			(port-handler-close handler) 
-			(port-handler-byte handler)
-			; Line buffering only makes sense for write-char
-			(lambda (port ch) 
-				(char-handler port ch)
-				(if (char=? ch #\newline) 
-					(force-output port))) ; Raise error if port is not open
-			(port-handler-block handler)
-			(port-handler-ready? handler)
-			(port-handler-force handler))))
+			(port-handler-discloser buf-handler)
+			(port-handler-close buf-handler)
+			;;;;
+			; byte handler
+			(lambda (port byte) 
+			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			   (cond 
+				((buf-policy=? bufpol bufpol/none) ((port-handler-byte unbuf-handler) port byte))
+				(else (buf-byte-handler port byte))))) ; line and block
+			; char handler
+			(lambda (port char) 
+			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			   (cond 
+				((buf-policy=? bufpol bufpol/block) (buf-char-handler port char))
+				((buf-policy=? bufpol bufpol/line) 
+					(buf-char-handler port char)
+					(if (char=? char #\newline) (force-output port)))
+				((buf-policy=? bufpol bufpol/none) ((port-handler-char unbuf-handler) port char)))))
+			; block handler
+			(lambda (port buffer start count)
+			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			   (cond 
+			   	((buf-policy=? bufpol bufpol/none) ((port-handler-block unbuf-handler) port buffer start count))
+				(else (buf-block-handler port buffer start count))))) ; line and block
+			;;;;
+			(port-handler-ready? buf-handler)
+			(port-handler-force buf-handler))))
 
-(define (make-linebuf-output-fdport channel buffer-size closer)
-	(let ((port
-	       (make-buffered-output-port 
-				linebuf-output-fdport-handler
-				(make-channel-cell channel closer)
-				(make-byte-vector buffer-size 0)
+(define (construct-output-fdport channel bufpol buffer-size closer)
+	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
+						unbuf-port-buf-size ; not really important because unbuf will mostly bypass buffer, leave for consistency
+						buffer-size))
+		   (port
+			(make-buffered-output-port 
+				bufpol-output-fdport-handler
+				(make-channel-cell channel closer bufpol bufsize)
+				(make-byte-vector (channel-buffer-size) 0)
 				0
-				buffer-size)))
+				(channel-buffer-size)))) ; port limit that we don't actually care about
 	; (periodically-force-output! port) ; TODO do we want to enable this at all in scsh? maybe bufpol/auto?
 	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
-
-;----------------
-; Unbuffered Output ports
-
-(define unbuffered-output-handler
-  (make-unbuffered-output-port-handler 
-  		(lambda (port)
-			(list 'unbuf-output-fdport (channel-cell-ref (port-data port))))
-		(lambda (port)
-			(port-channel-closer (port-data port)))
-		(lambda (port buffer start count)
-			(channel-write (channel-cell-ref (port-data port)) buffer start count))
-		(lambda (port)			; ready
-			(channel-ready? (channel-cell-ref (port-data port))))))
-
-(define (make-unbuf-output-fdport channel closer)
-	(let ((port 
-			(make-unbuffered-output-port unbuffered-output-handler
-				(make-channel-cell channel closer))))
-	(set-port-crlf?! port (channel-crlf?))
-	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
-	port))
-
 
 ; Utilities
 

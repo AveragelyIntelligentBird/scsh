@@ -30,10 +30,10 @@
       ; Valid ports
       ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
         (debug-message "Making block buf input port")
-        (make-blockbuf-input-fdport channel buffer-size close-fdport-channel))
+        (construct-input-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/none)
         (debug-message "Making unbuf input port")
-        (make-unbuf-input-fdport channel close-fdport-channel)))))
+        (construct-input-fdport channel bufpol buffer-size close-fdport-channel)))))
 
 (define (make-output-fdport channel . maybe-buffer-size)
   (let ((buffer-size (if (null? maybe-buffer-size) 
@@ -63,13 +63,13 @@
       ; Valid ports
       ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
         (debug-message "Making block buf output port")
-        (make-blockbuf-output-fdport channel buffer-size close-fdport-channel))
+        (construct-output-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/line)
         (debug-message "Making line buf output port")
-        (make-linebuf-output-fdport channel buffer-size close-fdport-channel))
+        (construct-output-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/none)
         (debug-message "Making unbuf output port")
-        (make-unbuf-output-fdport channel close-fdport-channel)))))
+        (construct-output-fdport channel bufpol buffer-size close-fdport-channel)))))
 
 
 ; Since we cannot set a handler on an existing port, we will set the 
@@ -98,6 +98,5 @@
           (assertion-violation 'set-port-buffering
             "cannot set line buffering on input ports"
             set-port-buffering port bufpol))
-      (input? (reset-fdport-for-bufpol port bufpol buffer-size))
       (else 
-        (assertion-violation 'set-port-buffering "TODO: implement me"))))) 
+        (reset-fdport-for-bufpol port bufpol buffer-size input?))))) 
