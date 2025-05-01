@@ -41,6 +41,7 @@
   (export 
     fdport->channel
     fdport->fd
+    fdport-i/o-started?
 
     construct-input-fdport
     construct-output-fdport

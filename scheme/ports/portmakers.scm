@@ -77,8 +77,6 @@
 (define (set-port-buffering port bufpol . maybe-buffer-size)
   (check-arg fdport? port set-port-buffering)
   (check-arg buf-policy? bufpol set-port-buffering)
-  ; TODO: address non-empty buffer case. Restrict altogether? warn that will be lost? flush for outport, ignore for inports?
-  ; (flush-fdport port)
   (let* ((input? (input-port? port))
          (buffer-size (if (null? maybe-buffer-size) 
                           max-soft-bufsize 
@@ -88,6 +86,10 @@
                        ( else bufpol))))               
     (cond 
       ; Errors
+      ((fdport-i/o-started? port)
+        (assertion-violation 'set-port-buffering
+            "cannot set buffering policy on a port that already began i/o"
+            set-port-buffering port))
       ((or (not (integer? buffer-size)) 
            (and input? (>= 0 buffer-size))
            (and (not input?) (> 0 buffer-size)))

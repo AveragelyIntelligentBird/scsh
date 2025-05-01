@@ -14,7 +14,7 @@
 ; closing method.
 
 (define-synchronized-record-type channel-cell :channel-cell
-  (really-make-channel-cell channel closer condvar bufpol soft-bufsize in-use?)
+  (really-make-channel-cell channel closer condvar bufpol soft-bufsize i/o-started? in-use?)
   (in-use? sent)
   channel-cell?
   (channel channel-cell-ref)
@@ -22,11 +22,12 @@
   (condvar channel-cell-condvar)
   (bufpol  channel-cell-bufpol  set-channel-cell-bufpol!)
   (soft-bufsize  channel-cell-soft-bufsize  set-channel-cell-soft-bufsize!) ; user specified buffer size
+  (i/o-started? channel-cell-i/o-started? set-channel-cell-i/o-started?!)   ; if yes, we cannot change the bufpol
   (in-use? channel-cell-in-use? set-channel-cell-in-use?!)
   (sent    channel-cell-sent    set-channel-cell-sent!))
 
 (define (make-channel-cell channel closer bufpol bufsize)
-  (really-make-channel-cell channel closer (make-condvar) bufpol bufsize #f))
+  (really-make-channel-cell channel closer (make-condvar) bufpol bufsize #f #f))
 
 ; TODO: transfer all lookup table stuff here
 
@@ -34,15 +35,25 @@
 (define (fdport->bufpol port)
   (let ((data (port-data port)))
     (if (channel-cell? data)
-	(channel-cell-bufpol data)
-	#f)))
+		(channel-cell-bufpol data)
+		(assertion-violation 'fdport->channel
+			"not an fd port" fdport->channel port))))
 
 ; Extracting the channel from fdport
 (define (fdport->channel port)
   (let ((data (port-data port)))
     (if (channel-cell? data)
-	(channel-cell-ref data)
-	#f)))
+		(channel-cell-ref data)
+		(assertion-violation 'fdport->channel
+			"not an fd port" fdport->channel port))))
+
+; Extracting bufpol from fdport
+(define (fdport-i/o-started? port)
+  (let ((data (port-data port)))
+    (if (channel-cell? data)
+		(channel-cell-i/o-started? data)
+		(assertion-violation 'fdport-i/o-started?
+			"not an fd port" fdport-i/o-started? port))))
 
 ; Extracting the fd from fdport
 (define (fdport->fd port)
@@ -93,6 +104,7 @@
 (define (bufpol-buffer-filler port wait?) 
   (let ((cell (port-data port))
 		(buffer (port-buffer port)))
+	(set-channel-cell-i/o-started?! cell #t)
     (let ((unbuf? (buf-policy=? (channel-cell-bufpol cell) bufpol/none))
 		  (soft-bufsize (channel-cell-soft-bufsize cell))
 		  (condvar (channel-cell-condvar cell))
@@ -513,6 +525,7 @@
 				(lambda (port) (list 'dummy))     ; discloser
 				(lambda (port) (list 'dummy))     ; closer
 				(lambda (port buffer start count) ; write-block
+					(set-channel-cell-i/o-started?! (port-data port) #t)
 					(channel-write (channel-cell-ref (port-data port)) buffer start count))
 				(lambda (port)			          ; ready
 					(channel-ready? (channel-cell-ref (port-data port))))))
@@ -527,22 +540,28 @@
 			;;;;
 			; byte handler
 			(lambda (port byte) 
-			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			 (let* ((cell (port-data port))
+				    (bufpol (channel-cell-bufpol cell)))
+			   (set-channel-cell-i/o-started?! cell #t)
 			   (cond 
 				((buf-policy=? bufpol bufpol/none) ((port-handler-byte unbuf-handler) port byte))
 				(else (buf-byte-handler port byte))))) ; line and block
 			; char handler
 			(lambda (port char) 
-			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			 (let* ((cell (port-data port))
+				    (bufpol (channel-cell-bufpol cell)))
+			   (set-channel-cell-i/o-started?! cell #t)
 			   (cond 
-				((buf-policy=? bufpol bufpol/block) (buf-char-handler port char))
+			    ((buf-policy=? bufpol bufpol/block) (buf-char-handler port char))
 				((buf-policy=? bufpol bufpol/line) 
 					(buf-char-handler port char)
 					(if (char=? char #\newline) (force-output port)))
 				((buf-policy=? bufpol bufpol/none) ((port-handler-char unbuf-handler) port char)))))
 			; block handler
 			(lambda (port buffer start count)
-			 (let ((bufpol (channel-cell-bufpol (port-data port))))
+			 (let* ((cell (port-data port))
+				    (bufpol (channel-cell-bufpol cell)))
+			   (set-channel-cell-i/o-started?! cell #t)
 			   (cond 
 			   	((buf-policy=? bufpol bufpol/none) ((port-handler-block unbuf-handler) port buffer start count))
 				(else (buf-block-handler port buffer start count))))) ; line and block
