@@ -43,8 +43,10 @@
     fdport->fd
     fdport-i/o-started?
 
-    construct-input-fdport
-    construct-output-fdport
+    really-make-input-fdport
+    really-make-output-fdport
+
+    output-port-forcers
 
     max-soft-bufsize
     reset-fdport-for-bufpol
@@ -52,7 +54,6 @@
 
 (define-interface scsh-newports-interface
   (export 
-    make-output-fdport ; TODO - remove
     ; Setter for bufpol on a port
     set-port-buffering
 

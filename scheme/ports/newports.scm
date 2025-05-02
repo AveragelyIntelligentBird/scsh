@@ -72,7 +72,7 @@
     port))
 
 (define (make-output-fdport/fd fd revealed)
-  (let ((port (make-output-fdport (make-output-channel fd))))
+  (let ((port (make-output-fdport (make-output-channel fd) bufpol/block)))
     (set-fdport! fd port revealed)
     port))
 
@@ -105,10 +105,10 @@
             (list cwd-resource umask-resource euid-resource egid-resource)
             (lambda ()
               (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
-          (channel (s48-port->channel s48-port))
-          (port (if (input-port? s48-port)
-                  (make-input-fdport channel)
-                  (make-output-fdport channel))))
+         (channel (s48-port->channel s48-port))
+         (port (if (input-port? s48-port)
+                    (make-input-fdport channel bufpol/block)
+                    (make-output-fdport channel bufpol/block))))
     (set-fdport! (fdport->fd port) port 0)
     port))
 

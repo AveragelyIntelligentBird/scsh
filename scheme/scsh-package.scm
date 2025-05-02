@@ -219,7 +219,13 @@
 (define-structure scsh-channel-ports scsh-channel-ports-interface
   (open scheme-level-1 byte-vectors define-record-types ascii
     ports
-    i/o i/o-internal text-codecs
+    i/o
+    (modify i/o-internal (hide output-port-forcers))
+    session-data
+    (subset weak (make-weak-pointer
+                      weak-pointer?
+                      weak-pointer-ref))
+    text-codecs
     channels channel-i/o
     (subset threads-internal (maybe-commit-no-interrupts))
     os-strings
@@ -274,7 +280,7 @@
                 (rename (force-output s48-force-output)))
         (modify formats (rename (format s48-format))
                 (expose format))
-        i/o-internal
+        (modify i/o-internal (hide output-port-forcers))
         channels
         channel-i/o
         (subset exceptions (assertion-violation))

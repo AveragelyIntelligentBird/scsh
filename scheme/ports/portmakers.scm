@@ -5,75 +5,64 @@
 
 ;; Actual fdport makers
 
-(define (make-input-fdport channel . maybe-buffer-size)
-  (let ((buffer-size (if (null? maybe-buffer-size) 
-                         max-soft-bufsize 
-                         (car maybe-buffer-size))))
-  (really-make-input-fdport channel bufpol/block buffer-size))) ; Block buffering default
-
-(define (really-make-input-fdport channel bufpol buffer-size)
-  (let* ((bufpol (if (= 1 buffer-size) bufpol/none bufpol))) 
+(define (make-input-fdport channel bufpol . maybe-buffer-size)
+  (let* ((buffer-size (if (null? maybe-buffer-size) 
+                          max-soft-bufsize 
+                          (car maybe-buffer-size)))
+         (bufpol (if (= 1 buffer-size) bufpol/none bufpol))) 
   (cond 
       ; Errors
       ((or (not (integer? buffer-size)) (>= 0 buffer-size)) 
-          (assertion-violation 'really-make-input-fdport
+          (assertion-violation 'make-input-fdport
             "invalid buffer size"
-            really-make-input-fdport channel buffer-size))
+            make-input-fdport channel buffer-size))
       ((not (channel? channel))
-          (assertion-violation 'really-make-input-fdport
+          (assertion-violation 'make-input-fdport
             "invalid channel"
-            really-make-input-fdport channel buffer-size))
+            make-input-fdport channel buffer-size))
       ((buf-policy=? bufpol bufpol/line)
-        (assertion-violation 'really-make-input-fdport
+        (assertion-violation 'make-input-fdport
           "line buffering is invalid on input ports"
-          really-make-input-fdport channel bufpol))
+          make-input-fdport channel bufpol))
       ; Valid ports
       ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
         (debug-message "Making block buf input port")
-        (construct-input-fdport channel bufpol buffer-size close-fdport-channel))
+        (really-make-input-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/none)
         (debug-message "Making unbuf input port")
-        (construct-input-fdport channel bufpol buffer-size close-fdport-channel)))))
-
-(define (make-output-fdport channel . maybe-buffer-size)
-  (let ((buffer-size (if (null? maybe-buffer-size) 
-                         max-soft-bufsize 
-                         (car maybe-buffer-size))))
-  (really-make-output-fdport channel bufpol/block buffer-size))) ; Block buffering default
-
-; TODO - remove, this is just for testing
-(define (make-output-fdport/bufpol channel bufpol . maybe-buffer-size)
-  (let ((buffer-size (if (null? maybe-buffer-size) 
-                         max-soft-bufsize 
-                         (car maybe-buffer-size))))
-  (really-make-output-fdport channel bufpol buffer-size)))
+        (really-make-input-fdport channel bufpol buffer-size close-fdport-channel)))))
           
-(define (really-make-output-fdport channel bufpol buffer-size)
-  (let* ((bufpol (if (= 0 buffer-size) bufpol/none bufpol))) 
+(define (make-output-fdport channel bufpol . maybe-buffer-size)
+  (let* ((buffer-size (if (null? maybe-buffer-size) 
+                          max-soft-bufsize 
+                         (car maybe-buffer-size)))
+         (bufpol (if (= 0 buffer-size) bufpol/none bufpol))) 
   (cond 
       ; Errors
       ((or (not (integer? buffer-size)) (> 0 buffer-size))
-          (assertion-violation 'really-make-output-fdport
+          (assertion-violation 'make-output-fdport
             "invalid buffer size"
-            really-make-output-fdport channel buffer-size))
+            make-output-fdport channel buffer-size))
       ((not (channel? channel))
-          (assertion-violation 'really-make-output-fdport
+          (assertion-violation 'make-output-fdport
             "invalid channel"
-            really-make-output-fdport channel buffer-size))
+            make-output-fdport channel buffer-size))
       ; Valid ports
       ((buf-policy=? bufpol bufpol/block) ; TODO: do we want to warn about too small buf for block?
         (debug-message "Making block buf output port")
-        (construct-output-fdport channel bufpol buffer-size close-fdport-channel))
+        (really-make-output-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/line)
         (debug-message "Making line buf output port")
-        (construct-output-fdport channel bufpol buffer-size close-fdport-channel))
+        (really-make-output-fdport channel bufpol buffer-size close-fdport-channel))
       ((buf-policy=? bufpol bufpol/none)
         (debug-message "Making unbuf output port")
-        (construct-output-fdport channel bufpol buffer-size close-fdport-channel)))))
+        (really-make-output-fdport channel bufpol buffer-size close-fdport-channel)))))
 
-
-; Since we cannot set a handler on an existing port, we will set the 
-; bufpol data field and have the handlers always check that 
+;;; Buffering policy setter
+;; Works only on ports where i/o has not yet been started. Since we cannot set! a port's 
+;; handler or buffer, we rely on auxilary data in channel-cell record to perform buffering control.
+;; One unfortunate implication is that every port will have an internal buffer of size equal 
+;; to max-soft-bufsize, regardless of the actual buffer size requested by user. 
 (define (set-port-buffering port bufpol . maybe-buffer-size)
   (check-arg fdport? port set-port-buffering)
   (check-arg buf-policy? bufpol set-port-buffering)
@@ -83,22 +72,26 @@
                           (car maybe-buffer-size)))
          (bufpol (cond ((and input? (= 1 buffer-size)) bufpol/none)
                        ((and (not input?) (= 0 buffer-size)) bufpol/none)
-                       ( else bufpol))))               
+                       (else bufpol))))               
     (cond 
       ; Errors
       ((fdport-i/o-started? port)
-        (assertion-violation 'set-port-buffering
-            "cannot set buffering policy on a port that already began i/o"
-            set-port-buffering port))
+          (error
+            "Cannot set buffering policy on a port that already began i/o"
+            port))
+      ((> buffer-size max-soft-bufsize)
+          (error
+            "Given buffer size is bigger than the maximum buffer size"
+            buffer-size '> max-soft-bufsize))
       ((or (not (integer? buffer-size)) 
            (and input? (>= 0 buffer-size))
            (and (not input?) (> 0 buffer-size)))
-          (assertion-violation 'set-port-buffering
-            "invalid buffer size for the given bufpol"
-            set-port-buffering bufpol buffer-size))
+          (error 
+            "Invalid buffer size for the given bufpol"
+             bufpol buffer-size))
       ((and input? (buf-policy=? bufpol bufpol/line))
-          (assertion-violation 'set-port-buffering
-            "cannot set line buffering on input ports"
-            set-port-buffering port bufpol))
+          (error 
+            "Cannot set line buffering on input ports"
+            port bufpol))
       (else 
         (reset-fdport-for-bufpol port bufpol buffer-size input?))))) 

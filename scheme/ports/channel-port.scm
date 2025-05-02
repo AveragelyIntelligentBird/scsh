@@ -278,7 +278,7 @@
 
 ; Assuming all arguments are valid 
 (define unbuf-port-buf-size 64) ; Arbitrary small vlaue for unbuffered buffers
-(define (construct-input-fdport channel bufpol buffer-size closer)
+(define (really-make-input-fdport channel bufpol buffer-size closer)
 	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
 						unbuf-port-buf-size
 						buffer-size))
@@ -359,13 +359,6 @@
 		(- (provisional-port-index port) sent)
 		(channel-cell-condvar cell)
 		wait?)))
-
-;
-(define set-port-flushed! set-port-pending-eof?!)
-(define (call-to-flush! port thunk)
-  (set-port-flushed! port 'flushing) ; don't let the periodic flusher go crazy
-  (thunk)
-  (set-port-flushed! port #t))
 
 
 (define (make-one-byte-output buffer-emptier!)
@@ -569,7 +562,7 @@
 			(port-handler-ready? buf-handler)
 			(port-handler-force buf-handler))))
 
-(define (construct-output-fdport channel bufpol buffer-size closer)
+(define (really-make-output-fdport channel bufpol buffer-size closer)
 	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
 						unbuf-port-buf-size ; not really important because unbuf will mostly bypass buffer, leave for consistency
 						buffer-size))
@@ -581,11 +574,90 @@
 				0
 				(channel-buffer-size)))) ; port limit that we don't actually care about
 	; (periodically-force-output! port) ; TODO do we want to enable this at all in scsh? maybe bufpol/auto?
+	(register-flushable-port! port)
 	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
 
+;----------------
+; Code to 
+
+; And a current field.
+
+(define port-flushed port-pending-eof?)
+(define set-port-flushed! set-port-pending-eof?!)
+
+(define flushable-ports
+  (make-session-data-slot! (list #f)))
+
+(define (register-flushable-port! port)
+  (let ((pair (session-data-ref flushable-ports)))
+    (set-cdr! pair
+	      (cons (make-weak-pointer port)
+		    (cdr pair)))))
+
+; Return a list of thunks that will flush the buffer of each open port
+; that contains bytes that have been there since the last time
+; this was called.  The actual i/o is done using separate threads to
+; keep i/o errors from killing anything vital.
+; 
+; If USE-FLUSHED-FLAGS? is true this won't flush buffers that have been
+; flushed by someone else since the last call.  If it is false then flush
+; all non-empty buffers, because the system has nothing to do and is going
+; to pause while waiting for external events.
+
+(define (output-port-forcers use-flushed-flags?)
+  (let ((pair (session-data-ref flushable-ports)))
+    (let loop ((next (cdr pair))
+	       (last pair)
+	       (thunks '()))
+      (if (null? next)
+;	  (begin   (debug-message "[forcing "
+;				  (length thunks)
+;				  " thunk(s)]")
+	  thunks ;)
+	  (let ((port (weak-pointer-ref (car next))))
+	    (cond ((or (not port)	; GCed or closed so
+		       (not (open-output-port? port))) ; drop it from the list
+		   (set-cdr! last (cdr next))
+		   (loop (cdr next) last thunks))
+		  ((eq? (port-flushed port) 'flushing) ; somebody else is doing it
+		   (loop (cdr next) next thunks)) 
+		  ((and use-flushed-flags? ; flushed recently
+			(port-flushed port))
+		   (set-port-flushed! port #f)	; race condition, but harmless
+		   (loop (cdr next) next thunks))
+		  ((< 0 (port-index port)) ; non-empty
+		   (loop (cdr next) next
+			 (cons (make-forcing-thunk port)
+			       thunks)))
+		  (else			; empty
+		   (loop (cdr next) next thunks))))))))
+
+(define (make-forcing-thunk port)
+  (lambda ()
+;    (debug-message "[forcing port]")
+    (if (and (report-errors-as-warnings
+	       (lambda ()
+		 (force-output-if-open port))
+	       "error when flushing buffer; closing port"
+	       port)
+	     (open-output-port? port))
+	(report-errors-as-warnings
+	  (lambda ()
+	    (atomically! (set-port-index! port 0))	; prevent flushing
+	    ((port-handler-close (port-handler port))
+	     port))
+	  "error when closing port"
+	  port))))
+
+(define (call-to-flush! port thunk)
+  (set-port-flushed! port 'flushing) ; don't let the periodic flusher go crazy
+  (thunk)
+  (set-port-flushed! port #t))
+  
+;;
 ; Utilities
 
 (define (channel-buffer-size)
