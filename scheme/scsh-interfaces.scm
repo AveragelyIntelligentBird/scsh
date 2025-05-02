@@ -46,7 +46,7 @@
     really-make-input-fdport
     really-make-output-fdport
 
-    output-port-forcers
+    output-fdport-forcers
 
     max-soft-bufsize
     reset-fdport-for-bufpol

@@ -352,7 +352,7 @@
                    ((eq? term-switch 'c)
                     (let ((result (eval (read-exactly-one-sexp-from-string term-val)
                                         interaction-env)))
-                      (scsh-exit-now 0)))
+                      (scsh-exit-now 0))) ; TODO - do we not want to print result??
 
                    (top-entry   ; There was a -e <entry>.
                     ((eval top-entry interaction-env)

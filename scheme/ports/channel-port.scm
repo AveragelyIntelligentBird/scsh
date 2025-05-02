@@ -607,7 +607,7 @@
 ; all non-empty buffers, because the system has nothing to do and is going
 ; to pause while waiting for external events.
 
-(define (output-port-forcers use-flushed-flags?)
+(define (output-fdport-forcers use-flushed-flags?)
   (let ((pair (session-data-ref flushable-ports)))
     (let loop ((next (cdr pair))
 	       (last pair)

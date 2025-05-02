@@ -254,7 +254,7 @@
   (force-output (check-arg fdport? fdport flush-fdport)))
 
 (define (flush-all-ports)
-  (let ((thunks (output-port-forcers #f)))
+  (let ((thunks (output-fdport-forcers #f))) ; TODO - is it a good idea to only do fdports?
     (cond ((null? thunks)
            #f)
           (else
@@ -283,7 +283,7 @@
     (placeholder-value placeholder)))
 
 (define (flush-all-ports-no-threads)
-  (let ((thunks (output-port-forcers #f)))
+  (let ((thunks (append (output-fdport-forcers #f) (output-port-forcers #f)))) ; Flushes fdports and s48 ports (stdio) - TODO, revise all to be fdports?
     (for-each (lambda (thunk) (thunk)) thunks)))
 
 ;;; Extend R4RS i/o ops to handle file descriptors.

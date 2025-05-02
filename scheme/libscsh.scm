@@ -47,7 +47,7 @@
                            (current-error-port))
                   ))))
         (display "s48-command got not exactly one s-exp"
-                 (current-error-port)))))
+                 (current-error-port))))))
 
 ;; TODO write a procedure to be called time by time to let the
 ;; administrative threads run

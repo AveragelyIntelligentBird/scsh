@@ -220,7 +220,7 @@
   (open scheme-level-1 byte-vectors define-record-types ascii
     ports
     i/o
-    (modify i/o-internal (hide output-port-forcers))
+    i/o-internal
     session-data
     (subset weak (make-weak-pointer
                       weak-pointer?
@@ -280,7 +280,7 @@
                 (rename (force-output s48-force-output)))
         (modify formats (rename (format s48-format))
                 (expose format))
-        (modify i/o-internal (hide output-port-forcers))
+        i/o-internal
         channels
         channel-i/o
         (subset exceptions (assertion-violation))
