@@ -37,7 +37,7 @@
 	  %stat-file %stat-fdes
 	  %sync-file %sync-file-system))
 
-(define-interface scsh-channel-ports-interface
+(define-interface scsh-fdport-internal-interface
   (export 
     fdport->channel
     fdport->fd
@@ -46,17 +46,14 @@
     really-make-input-fdport
     really-make-output-fdport
 
-    output-fdport-forcers
-
     max-soft-bufsize
     reset-fdport-for-bufpol
-  ))	
+  
+    output-fdport-forcers))
 
-(define-interface scsh-newports-interface
+(define-interface scsh-fdports-interface
   (export 
-    ; Setter for bufpol on a port
     set-port-buffering
-
     call/fdes
 	  sleazy-call/fdes
 	  fdes->inport
@@ -72,7 +69,6 @@
 	  open-file
 	  pipe
 	  with-current-output-port*
-	  close-after
 	  with-current-error-port
 	  with-current-output-port
 	  with-current-input-port
@@ -107,7 +103,16 @@
 	  with-output-to-file with-input-from-file
 	  call-with-input-file call-with-output-file
 	  open-output-file
-    init-fdports!))
+    init-fdports!
+  
+    move->fdes
+    dup
+    dup->fdes dup->inport dup->outport
+    ;; Not available to user
+    shell-open
+    create+trunc
+    write+append+create
+    read-only))
 
 (define-interface scsh-bufpol-interface 
   (export 
@@ -122,8 +127,7 @@
     bufpol/none
     
     ; Bufpol equality
-    buf-policy=?
-))
+    buf-policy=?))
 
 (define-interface scsh-io-interface 
   (export close
@@ -356,15 +360,6 @@
           exec-path-list
           init-exec-path-list)) ; ### should be internal
 
-(define-interface scsh-fdports-interface
-  (export move->fdes
-          dup
-          dup->fdes dup->inport dup->outport
-          shell-open
-          create+trunc
-          write+append+create
-          read-only))
-
 (define-interface scsh-process-state-interface
   (export with-resources-aligned
 
@@ -438,8 +433,7 @@
           command-line
           arg
           arg*
-
-argv))
+          argv))
 
 (define-interface scsh-signals-interface
   (export (signal :syntax)

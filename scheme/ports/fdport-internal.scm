@@ -1,3 +1,7 @@
+;;; Part of scsh 1.0. See file COPYING for notices and license.
+;; bufpol-aware fdport handler + scsh-channel-cell + really-make's
+
+
 ; Since s48 did not expose some useful channel-port forms via its top-level interface, 
 ; we copy them over as is. Our goal is to keep scsh a self-contained s48 package, and 
 ; and this seems to be the best way. 
@@ -22,7 +26,7 @@
   (condvar channel-cell-condvar)
   (bufpol  channel-cell-bufpol  set-channel-cell-bufpol!)
   (soft-bufsize  channel-cell-soft-bufsize  set-channel-cell-soft-bufsize!) ; user specified buffer size
-  (i/o-started? channel-cell-i/o-started? set-channel-cell-i/o-started?!)   ; if yes, we cannot change the bufpol
+  (i/o-started? channel-cell-i/o-started? set-channel-cell-i/o-started?!)   ; if yes, we cannot change bufpol
   (in-use? channel-cell-in-use? set-channel-cell-in-use?!)
   (sent    channel-cell-sent    set-channel-cell-sent!))
 
@@ -580,6 +584,9 @@
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
 	port))
 
+
+; Utilities
+
 ;----------------
 ; Code to 
 
@@ -596,6 +603,12 @@
     (set-cdr! pair
 	      (cons (make-weak-pointer port)
 		    (cdr pair)))))
+
+(define (call-to-flush! port thunk)
+  (set-port-flushed! port 'flushing) ; don't let the periodic flusher go crazy
+  (thunk)
+  (set-port-flushed! port #t))
+
 
 ; Return a list of thunks that will flush the buffer of each open port
 ; that contains bytes that have been there since the last time
@@ -652,13 +665,6 @@
 	  "error when closing port"
 	  port))))
 
-(define (call-to-flush! port thunk)
-  (set-port-flushed! port 'flushing) ; don't let the periodic flusher go crazy
-  (thunk)
-  (set-port-flushed! port #t))
-  
-;;
-; Utilities
 
 (define (channel-buffer-size)
   (channel-parameter (enum channel-parameter-option buffer-size)))

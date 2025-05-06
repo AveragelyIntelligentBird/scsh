@@ -216,7 +216,7 @@
   (files (ports bufpol))
 )
 
-(define-structure scsh-channel-ports scsh-channel-ports-interface
+(define-structure scsh-fdport-internal scsh-fdport-internal-interface
   (open scheme-level-1 byte-vectors define-record-types ascii
     ports
     i/o
@@ -233,16 +233,15 @@
     condvars
     exceptions conditions signal-conditions
     architecture		; channel-opening options
-    (subset primitives      (channel-parameter))
+    (subset primitives  (channel-parameter))
     handle
     debug-messages		; for error messages
     scsh-bufpol
-    (subset util		(unspecific))
+    (subset util		    (unspecific))
     (subset primitives	(add-finalizer! os-error-message)))
-  (files (ports channel-port)))
+  (files (ports fdport-internal)))
 
-; TODO break up this into more reasonable pieces
-(define-structure scsh-newports (compound-interface scsh-newports-interface scsh-bufpol-interface) 
+(define-structure scsh-fdports (compound-interface scsh-fdports-interface scsh-bufpol-interface) 
   (open (modify scheme (rename (char-ready?  s48-char-ready?)
                                (read-char    s48-read-char)
                                (display      s48-display)
@@ -255,17 +254,17 @@
                       with-output-to-file
                       open-input-file
                       open-output-file))
-        scsh-channel-ports
+        scsh-fdport-internal
         scsh-bufpol
         debug-messages
-        (subset util		(unspecific))
+        (subset util	 (unspecific))
         (subset tables (table-set!
                         table-ref
                         make-integer-table))
         (subset weak (make-weak-pointer
                       weak-pointer?
                       weak-pointer-ref))
-        (subset enumerated (enum))
+        (subset enumerated   (enum))
         (subset byte-vectors (byte-vector-length))
         (subset placeholders (make-placeholder
                               placeholder-set!
@@ -287,9 +286,10 @@
         (modify channel-ports (rename (port->channel s48-port->channel)) (expose port->channel))
         ports
         (subset threads-internal (thread-continuation))
-        (modify posix-i/o (rename (port->fd s48-port->fd)) 
+        (modify posix-i/o (rename (port->fd s48-port->fd) (dup s48-dup) (dup2 s48-dup2)) ; TODO: revisit, make sure there are no internal channel-cell inconsistensies
           (expose port->fd
-                  dup)) ; TODO: revisit, make sure there are no internal channel-cell inconsistensies
+                  dup
+                  dup2)) 
         (modify posix-files (rename (open-file s48-open-file))
                 (expose open-file
                         file-options
@@ -322,9 +322,8 @@
         scsh-process-state
         (subset external-calls (import-lambda-definition-2))
         byte-vectors
-        session-data
-        finite-types) ; Bufpol
-  (files (ports newports) (ports portmakers)))
+        session-data) 
+  (files (ports fdports) (ports fdport-ops)))
 
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs
@@ -361,7 +360,7 @@
         scsh-file-names
         scsh-process-state
         delimited-readers
-        scsh-newports)
+        scsh-fdports)
   (files fileinfo
          file
          filesys))
@@ -391,7 +390,7 @@
         scsh-errnos
         scsh-process-state
         scsh-file
-        scsh-newports)
+        scsh-fdports)
   (files temp-file))
 
 (define-structure scsh-globbing scsh-globbing-interface
@@ -440,28 +439,6 @@
         (subset signals (error)))
   (files procobj))
 
-(define-structure scsh-fdports scsh-fdports-interface
-  (open (modify scheme (hide call-with-input-file
-                             call-with-output-file
-                             with-input-from-file
-                             with-output-to-file
-                             write
-                             display
-                             char-ready?
-                             read-char
-                             write-char
-                             newline
-                             open-input-file
-                             open-output-file))
-        signals
-        bitwise
-        (subset posix-files (file-options file-mode))
-        (subset posix-i/o (dup2))
-        (subset scsh-utilities (check-arg stringify))
-        scsh-file-syscalls
-        scsh-newports)
-  (files (ports fdports)))
-
 (define-structure scsh-signals scsh-signals-interface
   (open scheme
         (subset signals (error))
@@ -508,7 +485,6 @@
         scsh-process-state
         scsh-process-objects
         scsh-file-names
-        scsh-newports
         scsh-file
         scsh-fdports
         exit-hooks
@@ -546,7 +522,7 @@
         (subset external-calls (import-lambda-definition-2))
         (subset os-strings (string->os-string
                             os-string->byte-vector))
-        scsh-newports
+        scsh-fdports
         scsh-process-objects)
   (files tty))
 
@@ -565,8 +541,7 @@
                              open-output-file))
         (subset i/o (current-error-port))
         (subset scsh-utilities (define-simple-syntax))
-        scsh-fdports
-        scsh-newports)
+        scsh-fdports)
   (files stdio))
 
 (define-structure scsh-ptys scsh-ptys-interface
@@ -590,7 +565,6 @@
         (subset posix-files (file-options))
         (subset scsh-errnos (with-errno-handler))
         (subset scsh-syscall-support (byte-vector->string))
-        scsh-newports
         scsh-stdio
         scsh-tty
         scsh-process-state)
@@ -651,7 +625,6 @@
         scsh-temp-files
         scsh-processes scsh-process-objects
         scsh-stdio
-        scsh-newports
         scsh-fdports
         scsh-collect-ports)
   (files syntax
@@ -748,15 +721,14 @@
         scsh-directories
         scsh-user/group-db
         scsh-process-state
-        scsh-newports
-        scsh-channel-ports
+        scsh-fdports
+        scsh-fdport-internal
         scsh-port-codecs
         scsh-file
         scsh-temp-files
         scsh-globbing
         scsh-process-objects
         scsh-processes
-        scsh-fdports
         scsh-signals
         scsh-tty
         scsh-stdio

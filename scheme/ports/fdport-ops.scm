@@ -1,99 +1,44 @@
-;;; A Unix file port system to completely replace S48 file ports.
-;;; We use S48 extensible ports.
-;;; Copyright (c) 1993 by Olin Shivers.
+;;; Part of scsh 1.0. See file COPYING for notices and license.
+;; user-facing fdport operations + syscalls
 
-;;; A functional search tree mapping integer file descriptors to ports. I'm
-;;; putting it all in a cell so that reffing and setting can be done provisionally
-;;; and be protected by optimistic concurrency.
-(define *fdports* (make-cell (make-search-tree = <)))
 
-;;; Sets the port and reveal count for fd, and always replaces if fd was already
-;;; in the table.
-(define (set-fdport! fd port revealed)
-  (atomically!
-   (delete-fdport! fd)
-   (let ((ports-table (provisional-cell-ref *fdports*)))
-     (if (not (zero? revealed))
-         (begin (provisional-cell-set! *fdports* (search-tree-insert ports-table fd (cons port revealed)))
-                (%set-cloexec fd #f))
-         (begin
-           (provisional-cell-set! *fdports* (search-tree-insert ports-table fd (cons (make-weak-pointer port) revealed)))
-           (%set-cloexec fd #t))))))
-
-;;; Removes fd from the table if it was installed.
-(define (delete-fdport! fd)
-  (atomically!
-   (provisional-cell-set!
-    *fdports* (search-tree-delete (provisional-cell-ref *fdports*) fd))))
-
-;;; Returns the port and revealed count for fd in a cons cell (port . revealed).
-;;; Returns #f if fd wasn't installed.
-(define (maybe-ref-fdport fd)
-  (atomically
-   (let* ((ports-table (provisional-cell-ref *fdports*))
-          (ref (search-tree-ref ports-table fd)))
-     (and ref (if (weak-pointer? (car ref))
-                  (let ((val (weak-pointer-ref (car ref))))
-                    (if val
-                        (cons val (cdr ref))
-                        (begin (provisional-cell-set! *fdports* (search-tree-delete ports-table fd))
-                               #f)))
-                  ref)))))
-
-;;; Uses reffer to get a desired value from the cons pair returned by
-;;; (maybe-ref-fdport fd)
-(define (maybe-ref-fdport-* reffer fd)
-  (let ((ref (maybe-ref-fdport fd)))
-    (if ref
-        (reffer ref)
-        ref)))
-
-;;; Returns the port mapped to fd, or #f if it wasn't installed.
-(define (maybe-ref-fdport-port fd)
-  (maybe-ref-fdport-* car fd))
-
-;;; Returns fd's revealed count, or #f if it wasn't installed.
-(define (maybe-ref-fdport-revealed fd)
-  (maybe-ref-fdport-* cdr fd))
-
-(define (make-input-channel fd)
-  (open-channel fd "input" (enum channel-status-option input) #t))
-
-(define (make-output-channel fd)
-  (open-channel fd "output" (enum channel-status-option output) #t))
-
-(define (close-fdport-channel channel)
-  (delete-fdport! (channel-os-index channel))
-  (close-channel channel))
-
-(define (make-input-fdport/fd fd revealed)
-  (let ((port (make-input-fdport (make-input-channel fd))))
-    (set-fdport! fd port revealed)
-    port))
-
-(define (make-output-fdport/fd fd revealed)
-  (let ((port (make-output-fdport (make-output-channel fd) bufpol/block)))
-    (set-fdport! fd port revealed)
-    port))
-
-;;; This is now really just a check if x is a channel port, and is
-;;; installed in *fdports*
-(define (fdport? x)
-  (and (or (input-port? x) (output-port? x))
-       (fdport->channel x)  ; Has OS-channel in the data field
-       (maybe-ref-fdport (fdport->fd x))
-       #t))
-
-(define (fdport:revealed fdport)
-  (check-arg fdport? fdport fdport:revealed)
-  (maybe-ref-fdport-revealed (fdport->fd fdport)))
-
-(define (set-fdport:revealed! fdport revealed)
-  (check-arg fdport? fdport set-fdport:revealed!)
-  (set-fdport! (fdport->fd fdport) fdport revealed))
-
-(define (fdport-channel-ready? fdport)
-  (channel-ready? (fdport->channel fdport)))
+;;; Buffering policy setter
+;; Works only on ports where i/o has not yet been started. Since we cannot set! a port's 
+;; handler or buffer, we rely on auxilary data in channel-cell record to perform buffering control.
+;; One unfortunate implication is that every port will have an internal buffer of size equal 
+;; to max-soft-bufsize, regardless of the actual buffer size requested by user. 
+(define (set-port-buffering port bufpol . maybe-buffer-size)
+  (check-arg fdport? port set-port-buffering)
+  (check-arg buf-policy? bufpol set-port-buffering)
+  (let* ((input? (input-port? port))
+         (buffer-size (if (null? maybe-buffer-size) 
+                          max-soft-bufsize 
+                          (car maybe-buffer-size)))
+         (bufpol (cond ((and input? (= 1 buffer-size)) bufpol/none)
+                       ((and (not input?) (= 0 buffer-size)) bufpol/none)
+                       (else bufpol))))               
+    (cond 
+      ; Errors
+      ((fdport-i/o-started? port)
+          (error
+            "Cannot set buffering policy on a port that already began i/o"
+            port))
+      ((> buffer-size max-soft-bufsize)
+          (error
+            "Given buffer size is bigger than the maximum buffer size"
+            buffer-size '> max-soft-bufsize))
+      ((or (not (integer? buffer-size)) 
+           (and input? (>= 0 buffer-size))
+           (and (not input?) (> 0 buffer-size)))
+          (error 
+            "Invalid buffer size for the given bufpol"
+             bufpol buffer-size))
+      ((and input? (buf-policy=? bufpol bufpol/line))
+          (error 
+            "Cannot set line buffering on input ports"
+            port bufpol))
+      (else 
+        (reset-fdport-for-bufpol port bufpol buffer-size input?))))) 
 
 ;;; Open & Close
 ;;; ------------
@@ -123,11 +68,7 @@
          (options (file-options-union options (file-options write-only))))
     (apply open-file fname options maybe-mode)))
 
-(define (increment-revealed-count port delta)
-  (atomically!
-   (let* ((count (fdport:revealed port))
-          (newcount (+ count delta)))
-     (set-fdport:revealed! port newcount))))
+
 
 (define (release-port-handle port)
   (check-arg fdport? port release-port-handle)
@@ -188,29 +129,85 @@
               ((fdport->channel fd/port) (fdport->fd fd/port)) ;notice fd-port? instead of fdport?
               (else (error "Not a file descriptor or fdport." fd/port)))))
 
-;;; Random predicates and arg checkers
-;;; ----------------------------------
 
-(define (open-fdport? x)
-  (and (fdport? x) (or (open-output-port? x) (open-input-port? x))))
+;;; Moves an i/o handle FD/PORT to fd TARGET.
+;;; - If FD/PORT is a file descriptor, this is dup2(); close().
+;;; - If FD/PORT is a port, this shifts the port's underlying file descriptor
+;;;   to TARGET, as above, closing the old one. Port's revealed count is
+;;;   set to 1.
+;;; TARGET is evicted before the shift -- if there is a port allocated to
+;;; file descriptor TARGET, it will be shifted to another file descriptor.
 
-(define (fdport-open? port)
-  (check-arg fdport? port fdport-open?)
-  (eq? (channel-status (fdport->channel port))
-       (enum channel-status-option closed)))
+;; (define (move->fdes fd/port target)
+;;   (let ((doit (lambda (fd)
+;; 		(if (not (= fd target))
+;; 		    (begin (evict-ports target) ; Evicts any ports at TARGET.
+;; 			   (%dup2 fd target))))))
 
-;;; Initialise the system
-;;; ---------------------
+;;     (cond ((integer? fd/port)
+;; 	   (doit fd/port)
+;; 	   target)
 
-;;; JMG: should be deprecated-proc
-(define error-output-port
-  current-error-port)
+;; 	  ((fdport? fd/port)
+;; 	   (sleazy-call/fdes fd/port doit)
+;; 	   (if (%move-fdport target fd/port 1)
+;; 	       (error "fdport shift failed."))
+;; 	   fd/port)
+
+;; 	  (else (error "Argument not fdport or file descriptor" fd/port)))))
+
+(define (move->fdes port target) ; TODO - revise, increments revelated count??
+  (%dup2 (port->fdes port) target))
+
+(define (input-source? fd/port)
+  (check-arg fd/port? fd/port input-source?)
+  (input-port? fd/port))
+
+(define (output-source? fd/port)
+  (check-arg fd/port? fd/port output-source?)
+  (output-port? fd/port))
 
 
-(define (init-fdports!)
-  (set-fdport! (s48-port->fd (current-input-port)) (current-input-port) 1)
-  (set-fdport! (s48-port->fd (current-output-port)) (current-output-port) 1)
-  (set-fdport! (s48-port->fd (current-error-port)) (current-error-port) 1))
+;;; If FD/PORT is a file descriptor, returns a file descriptor.
+;;; If FD/PORT is a port, returns a port.
+
+(define (dup fd/port . maybe-target)
+  (check-arg fd/port? fd/port dup)
+  (apply (cond ((integer? fd/port) dup->fdes)
+	       ((input-port?  fd/port) dup->inport)
+	       ((output-port? fd/port) dup->outport))
+	 fd/port maybe-target))
+
+(define (dup->fdes fd/port . maybe-target)
+  (check-arg fd/port? fd/port dup->fdes)
+  (if (pair? maybe-target)
+      (let ((target (car maybe-target)))
+	(close-fdes target)	; Thus evicting any port there.
+	(sleazy-call/fdes fd/port (lambda (fd) (%dup2 fd target))))
+      (sleazy-call/fdes fd/port %dup)))
+
+(define (dup->inport fd/port . maybe-target)
+  (apply really-dup->port make-input-fdport/fd fd/port maybe-target))
+
+(define (dup->outport fd/port . maybe-target)
+  (apply really-dup->port make-output-fdport/fd fd/port maybe-target))
+
+(define (really-dup->port port-maker fd/port . maybe-target)
+  (let ((fd (apply dup->fdes fd/port maybe-target)))
+    (port-maker fd (if (null? maybe-target) 0 1))))
+
+;;; Not exported.
+(define (shell-open path flags fdes)
+  (%dup2 (port->fdes (open-file (stringify path) flags (file-mode read write))) fdes))
+
+(define create+trunc
+  (file-options write-only create truncate))
+
+(define write+append+create
+  (file-options write-only append create))
+
+(define read-only
+  (file-options read-only))
 
 ;;; Generic port operations
 ;;; -----------------------
@@ -236,7 +233,7 @@
 (define (evict-ports fd)
   (cond ((maybe-ref-fdport-port fd) =>       ; Shouldn't bump the revealed count.
          (lambda (port)
-             (%move-fdport (fdport->fd (dup port)) port 0)  ;s48's dup modifies port's channel for us
+             (%move-fdport (fdport->fd (s48-dup port)) port 0)  ;s48's dup modifies port's channel for us
              #t))
         (else #f)))
 
@@ -252,39 +249,6 @@
 
 (define (flush-fdport fdport)
   (force-output (check-arg fdport? fdport flush-fdport)))
-
-(define (flush-all-ports)
-  (let ((thunks (output-fdport-forcers #f))) ; TODO - is it a good idea to only do fdports?
-    (cond ((null? thunks)
-           #f)
-          (else
-           (let loop ((threads
-                       (map spawn-thread thunks))
-                      (new-threads '()))
-             (cond
-              ((not (null? threads))
-               (if (thread-continuation
-                    (car threads))
-                   (loop (cdr threads)
-                         (cons (car threads) new-threads))
-                   (loop (cdr threads) new-threads)))
-              ((not (null? new-threads))
-               (loop new-threads '()))))
-           #t))))
-
-(define (spawn-thread thunk)
-  (let ((placeholder (make-placeholder)))
-    (spawn
-     (lambda ()
-       (placeholder-set!
-        placeholder
-        (current-thread))
-       (thunk)))
-    (placeholder-value placeholder)))
-
-(define (flush-all-ports-no-threads)
-  (let ((thunks (append (output-fdport-forcers #f) (output-port-forcers #f)))) ; Flushes fdports and s48 ports (stdio) - TODO, revise all to be fdports?
-    (for-each (lambda (thunk) (thunk)) thunks)))
 
 ;;; Extend R4RS i/o ops to handle file descriptors.
 ;;; -----------------------------------------------
@@ -395,9 +359,9 @@
 ;;; I/O
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define seek/set 0)                     ;Unix codes for "whence"
+(define seek/set   0)        ; Unix codes for "whence"
 (define seek/delta 1)
-(define seek/end 2)
+(define seek/end   2)
 
 (define (seek fd offset . maybe-whence)
   (let ((whence (:optional maybe-whence seek/set))

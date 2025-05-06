@@ -42,7 +42,6 @@
 ;;;     (field-reader " \t" "\n")
 ;;; for a reader.
 
-
 ;; Loop until EOF reading characters or strings and writing (FILTER char)
 ;; or (FILTER string). Useful as an arg to FORK or FORK/PIPE.
 
