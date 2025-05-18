@@ -1,6 +1,5 @@
 ;;; Part of scsh 1.0. See file COPYING for notices and license.
-;; user-facing fdport operations + syscalls
-
+;; Contains high-level, user-facing fdport operations + syscalls
 
 ;;; Buffering policy setter
 ;; Works only on ports where i/o has not yet been started. Since we cannot set! a port's 
@@ -40,8 +39,8 @@
       (else 
         (reset-fdport-for-bufpol port bufpol buffer-size input?))))) 
 
-;;; Open & Close
-;;; ------------
+;;; File open and close -> fdport
+;;; ----------------------------------
 
 ; TODO implement our own open-file to avoid registering output port as "periodically flushed" at all smh
 (define (open-file fname options . maybe-mode)
@@ -68,8 +67,10 @@
          (options (file-options-union options (file-options write-only))))
     (apply open-file fname options maybe-mode)))
 
+;;; Port/fd ops
+;;; ----------------------------------
 
-
+;;; Decrements port revealed count
 (define (release-port-handle port)
   (check-arg fdport? port release-port-handle)
   (atomically!
@@ -78,6 +79,7 @@
          (let ((new-rev (- rev 1)))
            (set-fdport:revealed! port new-rev))))))
 
+;;; Gets the port revealed count
 (define (port-revealed port)
   (let ((count (fdport:revealed (check-arg fdport? port port-revealed))))
     (and (not (zero? count)) count)))
@@ -89,33 +91,39 @@
             p))
          (else (port-maker fd 1))))
 
+;;; Gets a port mapped to given fd + increments the revealed count
 (define (fdes->inport fd)
   (let ((port (fdes->port fd make-input-fdport/fd)))
     (if (not (input-port? port))
         (error "fdes was already assigned to an outport" fd)
         port)))
 
+;;; Gets a port mapped to given fd + increments the revealed count
 (define (fdes->outport fd)
   (let ((port (fdes->port fd make-output-fdport/fd)))
     (if (not (output-port? port))
         (error "fdes was already assigned to an inport" fd)
         port)))
 
-; TODO move to separate file to disambiguate with fdport->fd
+;;; Gets an fd associated with port + increments the revealed count
 (define (port->fdes port)
   (check-arg open-fdport? port port->fdes)
   (increment-revealed-count port 1)
   (fdport->fd port))
 
-(define (call/fdes fd/port proc)
+;;; Calls consumer on a file descriptor; takes care of revealed bookkeeping. 
+;; If fd/port is a file descriptor, this is just (consumer fd/port). 
+;; If fd/port is a port, calls consumer on its underlying file descriptor. 
+;; While consumer is running, the port's revealed count is incremented.
+(define (call/fdes fd/port consumer)
   (cond ((integer? fd/port)
-         (proc fd/port))
+         (consumer fd/port))
         ((fdport? fd/port)
          (let ((port fd/port))
            (dynamic-wind
             (lambda ()
               (if (not port) (error "Can't throw back into call/fdes.")))
-            (lambda () (proc (port->fdes port)))
+            (lambda () (consumer (port->fdes port))) ; increments revealed count
             (lambda ()
               (release-port-handle port)
               (set! port #f)))))
@@ -123,12 +131,10 @@
 
 ;;; Don't mess with the revealed count in the port case
 ;;; -- just sneakily grab the fdes and run.
-
 (define (sleazy-call/fdes fd/port proc)
   (proc (cond ((integer? fd/port) fd/port)
-              ((fdport->channel fd/port) (fdport->fd fd/port)) ;notice fd-port? instead of fdport?
+              ((fdport? fd/port) (fdport->fd fd/port))
               (else (error "Not a file descriptor or fdport." fd/port)))))
-
 
 ;;; Moves an i/o handle FD/PORT to fd TARGET.
 ;;; - If FD/PORT is a file descriptor, this is dup2(); close().
@@ -138,39 +144,37 @@
 ;;; TARGET is evicted before the shift -- if there is a port allocated to
 ;;; file descriptor TARGET, it will be shifted to another file descriptor.
 
-;; (define (move->fdes fd/port target)
-;;   (let ((doit (lambda (fd)
-;; 		(if (not (= fd target))
-;; 		    (begin (evict-ports target) ; Evicts any ports at TARGET.
-;; 			   (%dup2 fd target))))))
+; (define (move->fdes fd/port target)
+;   (let ((doit (lambda (fd)
+; 		(if (not (= fd target))
+; 		    (begin (evict-ports target) ; Evicts any ports at TARGET.
+; 			   (%dup2 fd target))))))
 
-;;     (cond ((integer? fd/port)
-;; 	   (doit fd/port)
-;; 	   target)
+;     (cond ((integer? fd/port)
+; 	   (doit fd/port)
+; 	   target)
 
-;; 	  ((fdport? fd/port)
-;; 	   (sleazy-call/fdes fd/port doit)
-;; 	   (if (%move-fdport target fd/port 1)
-;; 	       (error "fdport shift failed."))
-;; 	   fd/port)
+; 	  ((fdport? fd/port)
+; 	   (sleazy-call/fdes fd/port doit)
+; 	   (if (%move-fdport target fd/port 1)
+; 	       (error "fdport shift failed."))
+; 	   fd/port)
 
-;; 	  (else (error "Argument not fdport or file descriptor" fd/port)))))
+; 	  (else (error "Argument not fdport or file descriptor" fd/port)))))
 
 (define (move->fdes port target) ; TODO - revise, increments revelated count??
   (%dup2 (port->fdes port) target))
 
 (define (input-source? fd/port)
-  (check-arg fd/port? fd/port input-source?)
+  (check-arg fd/port? fd/port input-source?) ; TODO - I am not sure this is correct?
   (input-port? fd/port))
 
 (define (output-source? fd/port)
   (check-arg fd/port? fd/port output-source?)
   (output-port? fd/port))
 
-
 ;;; If FD/PORT is a file descriptor, returns a file descriptor.
 ;;; If FD/PORT is a port, returns a port.
-
 (define (dup fd/port . maybe-target)
   (check-arg fd/port? fd/port dup)
   (apply (cond ((integer? fd/port) dup->fdes)
@@ -212,10 +216,9 @@
 ;;; Generic port operations
 ;;; -----------------------
 
-;;; (close-after port f)
-;;;     Apply F to PORT. When F returns, close PORT, then return F's result.
-;;;     Does nothing special if you throw out or throw in.
-
+;; (close-after port f)
+;;   Apply F to PORT. When F returns, close PORT, then return F's result.
+;;   Does nothing special if you throw out or throw in.
 (define (close-after port f)
   (receive vals (f port)
     (close port)
@@ -227,9 +230,8 @@
          ((input-port?  port/fd) close-input-port)
          (else (error "Not file-descriptor or port" port/fd)))  port/fd))
 
-;;; If this fd has an associated input or output port,
-;;; move it to a new fd, freeing this one up.
-
+;; If this fd has an associated input or output port,
+;; move it to a new fd, freeing this one up.
 (define (evict-ports fd)
   (cond ((maybe-ref-fdport-port fd) =>       ; Shouldn't bump the revealed count.
          (lambda (port)
