@@ -179,7 +179,7 @@ install-scsh-image: install-scsh
 
 refman:
 	rm -rf $(srcdir)/doc/man/scsh/ $(srcdir)/doc/man/compiled
-	scribble --dest $(srcdir)/doc/man --htmls $(srcdir)/doc/man/scsh.scribble 
+	scribble --dest $(srcdir)/doc/man --htmls $(srcdir)/doc/man/scsh.scrbl 
 
 clean:
 	rm -rf c/*.o c/*.so c/*.dSYM *.sexpr scsh.image scsh go *.dSYM 
