@@ -669,8 +669,6 @@ s48_ref_t create_env(s48_call_t call, s48_ref_t vec) {
 s48_ref_t scm_gethostname(s48_call_t call)
 {
    char hostname[MAXHOSTNAMELEN+1];
-    /* different OS's declare differently, so punt the prototype. */
-    int gethostname();
     int retval = gethostname(hostname, MAXHOSTNAMELEN);
     if (retval == -1) s48_os_error_2(call, "scm_gethostname", errno, 0);
     return s48_enter_byte_string_2(call, hostname);

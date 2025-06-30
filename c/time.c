@@ -51,7 +51,7 @@
 extern char **environ;
 
 /* To work in the UTC time zone, do "environ = utc_env;". */
-static char *utc_env[] = {"TZ=UCT0", 0};
+static char *utc_env[] = {"TZ=UTC0", 0};
 
 #if defined(HAVE_TZNAME) && !defined(CYGWIN)
 extern char *tzname[];	/* Why isn't this defined in time.h? */
@@ -121,11 +121,11 @@ s48_ref_t time2date(s48_call_t call, s48_ref_t sch_t, s48_ref_t sch_zone) {
 	} else {
     char *newenv[2], **oldenv = NULL;
 
-    if (s48_byte_vector_p_2(call, sch_zone)) {			/* Time zone */
+    if (s48_byte_vector_p_2(call, sch_zone)) {			  /* Time zone */
       oldenv = make_newenv(call, sch_zone, newenv); 	/* Install new TZ. */
       if (!oldenv) s48_os_error_2(call, "time2date", errno, 2, sch_t, sch_zone);
-      d = *localtime(&t);			   	/* Do it. */
-    } else {					/* Local time */
+      d = *localtime(&t);			                      	/* Do it. */
+    } else {					                                /* Local time */
       d = *localtime(&t);
     }
 
@@ -143,7 +143,7 @@ s48_ref_t time2date(s48_call_t call, s48_ref_t sch_t, s48_ref_t sch_zone) {
       int error = 0;
       char *zone = tzname[d.tm_isdst];
       char *newzone = Malloc(char, 1+strlen(zone));
-
+      
       if (newzone) {
         strcpy(newzone, zone);
         sch_tz_name = s48_enter_string_latin_1_2(call, newzone);
@@ -160,9 +160,11 @@ s48_ref_t time2date(s48_call_t call, s48_ref_t sch_t, s48_ref_t sch_zone) {
 #ifdef HAVE_GMTOFF
     sch_tz_secs = s48_enter_fixnum (d.tm_gmtoff);
 #else
-    { char **oldenv = environ;			/* Set TZ to UTC     */
-      environ=utc_env;				/* time temporarily. */
-      tzset(); /* NetBSD, SunOS POSIX-noncompliance requires this. */
+    { 
+      char **oldenv = environ; /* Set TZ to UTC     */
+      environ=utc_env;				 /* time temporarily. */
+      tzset();                 /* NetBSD, SunOS POSIX-noncompliance requires this. */
+      d.tm_isdst = -1;         /* Force mktime() figure out DST from tm_zone */
       sch_tz_secs = s48_enter_long_2(call, mktime(&d) - t);
       environ=oldenv;
     }
