@@ -1,11 +1,12 @@
 #!/bin/sh
 
 srcdir=$1
+testmodule=$2
 
-./go <<EOF
+./go -s <<EOF
 ,config ,load $srcdir/test/test-packages.scm
-,open test-all
-(test-all)
+,open $testmodule
+(test-all #t)
 ,exit
 EOF
 echo ""

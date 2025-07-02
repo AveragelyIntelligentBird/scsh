@@ -114,7 +114,7 @@
 			   (display group)
 			   (display ":")
 			   (display name)
-			   (display " ... "))))
+			   (display " ==> "))))
       (if (not silent)
 	  (display-start))
 

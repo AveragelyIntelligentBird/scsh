@@ -51,8 +51,10 @@ COMPILED_LIBS = c/syscalls.so \
 
 enough: scsh scsh.image go
 
+TEST_STRUCT?=test-all
+
 test: enough
-	$(srcdir)/build/test.sh $(srcdir)
+	$(srcdir)/build/test.sh $(srcdir) $(TEST_STRUCT)
 
 .SUFFIXES: .c .so
 .c.so:

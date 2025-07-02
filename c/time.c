@@ -164,8 +164,12 @@ s48_ref_t time2date(s48_call_t call, s48_ref_t sch_t, s48_ref_t sch_zone) {
       char **oldenv = environ; /* Set TZ to UTC     */
       environ=utc_env;				 /* time temporarily. */
       tzset();                 /* NetBSD, SunOS POSIX-noncompliance requires this. */
-      d.tm_isdst = -1;         /* Force mktime() figure out DST from tm_zone */
+
+      int real_isdst = d.tm_isdst; /* Also, temporarily set tm_isdst to -1*/
+      d.tm_isdst = -1;             /* to force mktime() to figure out DST from tm_zone */
       sch_tz_secs = s48_enter_long_2(call, mktime(&d) - t);
+
+      d.tm_isdst = real_isdst; 
       environ=oldenv;
     }
 #endif

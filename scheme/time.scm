@@ -54,10 +54,6 @@
 ;;; Time
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                        ; TICKS/SEC is defined in OS-dependent code.
-                                        ; C fun is OS-dependent
-                                        ; TODO: all C files are identical, so move it to time1.c
-                                        ; returns (list secs ticks)
 (import-lambda-definition-2 %time+ticks () "time_plus_ticks")
 
 (define (time+ticks)
