@@ -122,6 +122,14 @@
     (set-fdport! fd port revealed)
     port))
 
+(define (remake-stdio-fdport fd s48-port input?)
+  (let* ((stdio-channel (s48-port->channel s48-port))
+         (port (if input?
+                  (make-input-fdport  stdio-channel bufpol/block)
+                  (make-output-fdport stdio-channel bufpol/block))))
+    (set-fdport! fd port 1) ; Setting port-revealed count to 1 from startup
+    port))
+
 ;;; Predicates and arg checkers
 ;;; ----------------------------------
 
@@ -215,8 +223,11 @@
 (define error-output-port
   current-error-port)
 
-; TODO replace with fdports
-(define (init-fdports!)
-  (set-fdport! (s48-port->fd (current-input-port))  (current-input-port)  1)
-  (set-fdport! (s48-port->fd (current-output-port)) (current-output-port) 1)
-  (set-fdport! (s48-port->fd (current-error-port))  (current-error-port)  1))
+(define (initialize-fdport-i/o* thunk)
+  (let ((in  (remake-stdio-fdport 0 (current-input-port) #t))
+        (out (remake-stdio-fdport 1 (current-output-port) #f))
+        (err (remake-stdio-fdport 2 (current-error-port) #f)))
+    (initialize-i/o in out err thunk)))
+
+(define-simple-syntax (initialize-fdport-i/o body ...)
+  (initialize-fdport-i/o* (lambda () body ...)))

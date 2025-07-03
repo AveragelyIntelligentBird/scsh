@@ -15,8 +15,7 @@
 (define-simple-syntax (with-stdio-ports body ...)
   (with-stdio-ports* (lambda () body ...)))
 
-
 (define (stdports->stdio)
   (dup (current-input-port)  0)
   (dup (current-output-port) 1)
-  (dup (current-error-port)   2))
+  (dup (current-error-port)  2))

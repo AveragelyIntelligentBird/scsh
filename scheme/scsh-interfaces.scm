@@ -103,7 +103,7 @@
 	  with-output-to-file with-input-from-file
 	  call-with-input-file call-with-output-file
 	  open-output-file
-    init-fdports!
+    initialize-fdport-i/o
   
     move->fdes
     dup
@@ -175,7 +175,7 @@
           tty-name->pty-name
           make-pty-generator
 
-          init-fdports!
+          initialize-fdport-i/o
 
           with-current-input-port*
           (with-current-input-port :syntax)

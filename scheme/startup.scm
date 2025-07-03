@@ -62,7 +62,7 @@
   (make-usual-resumer                     ; sets up exceptions, interrupts,
    #t                                     ; and current input & output
    (lambda (args)                         ; VM gives us our args, but not our program.
-     (init-fdports!)
+    (initialize-fdport-i/o
      (call-with-current-continuation
       (lambda (halt)
         (set! %vm-prog-args
@@ -94,7 +94,7 @@
              ;;                                       (wait-for-event)
              ;;                                       #f))))
              ;;     (if (integer? *result*) *result* 0)))
-             (if (integer? *result*) *result* 0))))))))) ; work around bug.
+             (if (integer? *result*) *result* 0)))))))))) ; work around bug.
 
 (define %vm-prog-args #f)
 
