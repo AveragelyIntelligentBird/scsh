@@ -57,6 +57,13 @@
 		(channel-os-index channel)
 		#f)))
 
+; Extracting the os-path from fdport
+(define (fdport->os-path port)
+  (let ((channel (fdport->channel port)))
+    (if channel
+		(channel-id channel)
+		#f)))
+
 ; Closing a port's channel.  This is called with a proposal already in place.
 (define (port-channel-closer cell)
   (channel-maybe-commit-and-close (channel-cell-ref cell)

@@ -89,7 +89,8 @@
           (lambda (p)
             (increment-revealed-count p 1)
             p))
-         (else (port-maker fd 1))))
+         (else (port-maker fd 1 
+                (string-append "<fdes->port on fd " (number->string fd) ">")))))
 
 ;;; Gets a port mapped to given fd + increments the revealed count
 (define (fdes->inport fd)
@@ -197,8 +198,11 @@
   (apply really-dup->port make-output-fdport/fd fd/port maybe-target))
 
 (define (really-dup->port port-maker fd/port . maybe-target)
-  (let ((fd (apply dup->fdes fd/port maybe-target)))
-    (port-maker fd (if (null? maybe-target) 0 1))))
+  (let ((fd (apply dup->fdes fd/port maybe-target))
+        (os-path (if (fdport? fd/port) 
+                     (fdport->os-path fd/port) 
+                     "<dup'd from fd>")))
+    (port-maker fd (if (null? maybe-target) 0 1) os-path)))
 
 ;;; Not exported.
 (define (shell-open path flags fdes)

@@ -110,14 +110,14 @@
         (really-make-output-fdport channel bufpol buffer-size close-fdport-channel)))))
 
 ;;; Makers for fdports given an fd
-(define (make-input-fdport/fd fd revealed)
-  (let* ((input-fdchannel (open-channel fd "input" (enum channel-status-option input) #t))
+(define (make-input-fdport/fd fd revealed os-path)
+  (let* ((input-fdchannel (open-channel fd os-path (enum channel-status-option input) #t))
          (port (make-input-fdport input-fdchannel bufpol/block)))
     (set-fdport! fd port revealed)
     port))
 
-(define (make-output-fdport/fd fd revealed)
-  (let* ((output-fdchannel (open-channel fd "output" (enum channel-status-option output) #t))
+(define (make-output-fdport/fd fd revealed os-path)
+  (let* ((output-fdchannel (open-channel fd os-path (enum channel-status-option output) #t))
          (port (make-output-fdport output-fdchannel bufpol/block)))
     (set-fdport! fd port revealed)
     port))
