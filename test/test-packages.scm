@@ -28,7 +28,7 @@
   (open scsh-user
         (subset posix-files (file-options file-mode file-mode=? file-mode-
                              integer->file-mode file-mode->integer))
-        (subset posix-i/o (port->fd))
+        (subset scsh-fdport-internal (fdport->fd))
         test-base)
   (files file-system-tests))
 
