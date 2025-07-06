@@ -13,7 +13,7 @@
 ;;;
 ;;; The subprocess is placed in its own session, and the tty device
 ;;; becomes the control tty for the new session/process-group/process.
-;;; The child runs with stio hooked up to the tty; the (error-output-port)
+;;; The child runs with stdio hooked up to the tty; the (error-output-port)
 ;;; port is unbuffered.
 
 (define (fork-pty-session thunk)
@@ -63,8 +63,9 @@
 (define (open-pty)
   (let ((pty-fd.tty-name (allocate-pty)))
     (if pty-fd.tty-name
-        (values (make-input-fdport/fd (car pty-fd.tty-name) 0)
-                (byte-vector->string (cdr pty-fd.tty-name)))
+        (let ((tty-name (byte-vector->string (cdr pty-fd.tty-name))))
+          (values (make-input-fdport/fd (car pty-fd.tty-name) 0 tty-name)
+                tty-name))
         (open-pty-from-devname))))
 
 ;;; The following code may in fact be system dependent.

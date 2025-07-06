@@ -149,41 +149,53 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Assign tty-info bits to a tty.
 
-(define (set-tty-info fdport option info)
-  (let ((if (tty-info:input-flags   info))
-	(of (tty-info:output-flags  info))
-	(cf (tty-info:control-flags info))
-	(lf (tty-info:local-flags   info))
-	(cc (tty-info:control-chars info))
-	(is (tty-info:input-speed-code  info))
-	(os (tty-info:output-speed-code info)))
-    (sleazy-call/file
-     fdport
-     call-with-input-file
-     (lambda (fd)
-       (%set-tty-info fd option
-		      cc
-		      if
-		      of
-		      cf
-		      lf
-		      is        os
-		      (tty-info:min  info)
-		      (tty-info:time info))))))
-
+(define (set-tty-info port/fd/fname option info)
+  (sleazy-call/file
+    port/fd/fname
+    call-with-input-file
+    (lambda (fd)
+      (%set-tty-info fd option
+        (tty-info:control-chars info)
+        (tty-info:input-flags   info)
+        (tty-info:output-flags  info)
+        (tty-info:control-flags info)
+        (tty-info:local-flags   info)
+        (tty-info:input-speed-code  info)
+        (tty-info:output-speed-code info)
+        (tty-info:min  info)
+        (tty-info:time info)))))
 
 (import-lambda-definition-2 %set-tty-info
   (fdes option control-chars iflag oflag cflag lflag ispeed-code ospeed-code
 	min time)
   "scheme_tcsetattr")
-
+  
 ;;; Exported procs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Note that the magic %set-tty-info/foo constants must be defined before this
 ;;; file is loaded due to the set-tty-info/foo definitions below.
 
-(define (make-tty-info-setter how)
-  (lambda (fdport info) (set-tty-info fdport how info)))
+(define (make-tty-info-setter option)
+  (lambda (info . maybe-fd/port/fname) 
+    (let ((fd/port/fname (:optional maybe-fd/port/fname (current-input-port))))
+      (if (not (tty? fd/port/fname))
+          (error "Argument to set-tty-info is not a tty" fd/port/fname))
+      (sleazy-call/file fd/port/fname
+        call-with-input-file
+        (lambda (fd)
+          (%set-tty-info fd option
+            (tty-info:control-chars info)
+            (tty-info:input-flags   info)
+            (tty-info:output-flags  info)
+            (tty-info:control-flags info)
+            (tty-info:local-flags   info)
+            (tty-info:input-speed-code  info)
+            (tty-info:output-speed-code info)
+            (tty-info:min  info)
+            (tty-info:time info)))))))
+
+;; TODO: If I had defined these with the parameters in the reverse order, 
+;; I could have made fd/port/fname optional. Too late now.
 
 (define set-tty-info/now   (make-tty-info-setter %set-tty-info/now))
 (define set-tty-info/drain (make-tty-info-setter %set-tty-info/drain))
