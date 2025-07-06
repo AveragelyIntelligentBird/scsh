@@ -110,7 +110,7 @@
 	(args (testdt-args test)))
 
     (let ((display-start (lambda ()
-			   (display "Testing ")
+			   (display "* Testing ")
 			   (display group)
 			   (display ":")
 			   (display name)
@@ -182,6 +182,7 @@
 		  tests))))
 
 (define (test-all . rest)
+  (newline)
   (for-each (lambda (test)
 	      (apply run-test
 		     test rest))
