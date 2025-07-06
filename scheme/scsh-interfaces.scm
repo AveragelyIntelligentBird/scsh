@@ -41,6 +41,7 @@
   (export 
     fdport->channel
     fdport->fd
+    fdport->os-path
     fdport-i/o-started?
 
     really-make-input-fdport
