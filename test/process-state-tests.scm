@@ -1,7 +1,9 @@
-;;; Tests for the functions in section 3.5 of the scsh-manual "Process state"   
-;;; Author: David Frese
+;;; Process State Tests ---------------------------------------------------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Extends work done by David Frese
 
-;; Notes: Only umask and cwd stuff, everything else isn't implemented yet.
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 ;; --- umask stuff ---
 

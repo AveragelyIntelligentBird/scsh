@@ -1,15 +1,9 @@
-;;; Test for the functions in section 3.6 of the scsh-manual "user and group database access"
-;;; Author: Christoph Hetz
+;;; User and Group DB Tests ----------------------------______-----------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Extends work done by Christoph Hetz
 
-;; for  testing: (certainly the path will be an other on other systems...)
-
-;; ,open define-record-types handle
-;; ,config ,load C:/cygwin/home/mephisto/cvs_scsh/scsh/scsh/test/test-packages.scm
-;; ,load C:/cygwin/home/mephisto/cvs_scsh/scsh/scsh/test/test-base.scm
-;; load this file
-;; (test-all)
-
-;; *** tests ***
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 (add-test! 'user-info 'user-and-group-db-access
   (lambda ()

@@ -1,14 +1,9 @@
-;;; Test for the function in section 7 of the scsh-manual "Reading Delimited strings"
-;;; Author: Christoph Hetz
+;;; Read Delimited Strings Tests ----------------------------------------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Extends work done by Christoph Hetz
 
-;; for  testing: (certainly the path will be an other on other systems...)
-
-;; ,open define-record-types handle
-;; ,config ,load C:/cygwin/home/mephisto/cvs-scsh/scsh/scsh/test/test-packages.scm
-;; ,load C:/cygwin/home/mephisto/cvs-scsh/scsh/scsh/test/test-base.scm
-;; load this file
-;; (test-all)
-
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 (add-test! 'read-line-test 'reading-delimited-strings
   (lambda ()

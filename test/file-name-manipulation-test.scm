@@ -1,17 +1,10 @@
-;;; Test for function in section 5.1 of the scsh-manual "file-name-... , diretory-... , ..."
-;;; Author: Christoph Hetz
+;;; Filename Manipulation Tests ---------------------------------------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Tests scsh's "file-name-... , diretory-... , ..." forms
+;; Extends work done by Christoph Hetz
 
-;; for now just the examples from the manual will be tested
-
-;; for  testing: (certainly the path will be an other on other systems...)
-
-;; ,open define-record-types handle
-;; ,config ,load C:/cygwin/home/mephisto/cvs-scsh/scsh/scsh/test/test-packages.scm
-;; ,load C:/cygwin/home/mephisto/cvs-scsh/scsh/scsh/test/test-base.scm
-;; load this file
-;; (test-all)
-
-;; *** tests ***
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 (add-test! 'file-name-directory? 'file-name-manipulation
   (lambda ()
@@ -197,3 +190,18 @@
   (lambda ()
     (equal? (home-file "man")
 	    (resolve-file-name "~/man"))))
+
+(add-test! 'file-name-sans-extension 'file-name-manipulation
+	   (lambda ()
+	     (and (string=? (file-name-sans-extension ".scm") ".scm")
+		  (string=? (file-name-sans-extension "/.scm") "/.scm")
+		  (string=? (file-name-sans-extension "a/.scm") "a/.scm")
+		  (string=? (file-name-sans-extension "t.scm") "t")
+		  (string=? (file-name-sans-extension "a/t.scm") "a/t")
+		  (string=? (file-name-sans-extension "/a/t.scm") "/a/t")
+		  (string=? (file-name-sans-extension "/a/b.c/t.scm") "/a/b.c/t")
+		  (string=? (file-name-sans-extension "") "")
+		  (string=? (file-name-sans-extension "t") "t")
+		  (string=? (file-name-sans-extension "a/t") "a/t")
+		  (string=? (file-name-sans-extension "/a/t") "/a/t")
+		  (string=? (file-name-sans-extension "/a/b.c/t") "/a/b.c/t"))))

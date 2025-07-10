@@ -72,36 +72,19 @@
   (files datetime-tests))
 
 ;; Environment variables
-(define-structure env-test
-  (export
-   setenv-test
-   getenv-test
-   env->alist-test
-   alist->env-test
-   alist-delete-test
-   alist-update-test
-   alist-compress-test
-   with-env*-test
-   with-total-env*-test
-   home-directory-test
-   exec-path-list-test
-   add-before-test
-   add-after-test)
-  (open scsh-user
- 	thread-fluids
-        (subset srfi-1 (every)))
-  (files env-test-code))
-
-(define-structure add-env-test
+(define-structure envvar-test
   (export)
   (open scsh-user
-	test-base
-        env-test)
-  (files env-test-add))
+	      test-base
+        debug-messages
+        thread-fluids
+        (subset srfi-1 (every)))
+  (files envvar-test))
 
 ;; Terminal device control
 (define-structure terminal-device-control-test (export)
   (open scsh-user
+        debug-messages
         test-base)
   (files terminal-device-control-test))
 
@@ -110,22 +93,18 @@
   (export test-all)
   (open scheme
         test-base
-        ; file-system-test
-        ; process-state-test
-        ; user-and-group-db-access-test
-        ; system-parameter-test
+        file-system-test 
+
+        process-state-test
+        user-and-group-db-access-test
+        system-parameter-test
         datetime-test
-        ; add-env-test
+        envvar-test
+
         ; terminal-device-control-test
       ))
 
 ;; --------------------------------------------------
-
-
-(define-structure strings-and-chars-test (export)
-  (open scsh-user
-	test-base)
-  (files strings-and-chars-test))
 
 (define-structure file-name-maniplation-test (export)
   (open scsh-user
@@ -148,7 +127,6 @@
         test-base
         
         test-all-syscalls
-        strings-and-chars-test
         file-name-maniplation-test
         read-delimited-strings-test
         bitwise-ops-test

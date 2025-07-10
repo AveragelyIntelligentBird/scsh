@@ -1,41 +1,52 @@
 
+;;; Environment Variables Tests ---------------------------------------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
 
-; TEST-CODE ***********************************************************************
-; all procedures return either #t or #f
+;;; Test data -----------------------------------------------------------------
+;; Defines records & constants used throughout the module
+
+(define alist
+  '(("Test-EDITOR" . "MyEditor")
+    ("Test-TERM"   . "SuperScsh")
+    ("Test-EDITOR" . "HerEditor")))
+(define env-alist-alist
+  '(("TEST-PATH" . '("Path1" "Path2" "Path3"))))
+
+(define number-list '("Eins" "Zwei" "Vier" "Eins" "Zwei" "Vier"))
+
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 ; Deleting a variable via (setenv var #f) cannot be tested, since 
 ; getenv returns #f in both cases: a) deleted variable or b) variable set to #f
-; OK
 (define (setenv-test var val)
   (setenv var val)
   (equal? (getenv var) val))
-
 ; getenv is tested with the same procedure than setenv
-; OK 2001-04-09 16:21
 (define getenv-test setenv-test)
+(add-test! 'setenv 'env setenv-test "Test-Var" "Hello!")
+(add-test! 'getenv 'env getenv-test "Test-Var" "Hallihallo!")   ; same as setenv-test
 
 ; env->alist-test test, if
 ; env->alist is an alist of pairs of string and if
 ; a previously set variable has the set value
-; OK 2001-04-09 16:21
 (define (env->alist-test var val)
   (setenv var val)
   (let ((alist (env->alist)))
-    (and (every (lambda (pair)                     ; syntactical correctness
+    (and (every (lambda (pair)         ; syntactical correctness
 		       (and (pair? pair)           ; entry is a pair
-			    (not (list? pair))     ; and not a list
-			    (string? (car pair))   ; car is a string...
-			    (or (string? (cdr pair)) ; ...cdr is either a string... 
-				(string-list? (cdr pair))))) ; ...or a string-list
+			    (not (list? pair))           ; and not a list
+			    (string? (car pair))         ; car is a string...
+			    (or (string? (cdr pair))     ; ...cdr is either a string... 
+				(string-list? (cdr pair)))))   ; ...or a string-list
 		alist)
 	 (equal? (cdr (assoc var alist))
 		 val))))                           ; previously set variable correctly present
+(add-test! 'env->alist 'env env->alist-test "env->alist-test-var" "env->alist-test-val")
 
-; checks if alist->enc really sets a new environment
+; TODO - investigate let-opt
+; checks if alist->env really sets a new environment
 ; by this way, it checks if a string list is transformed correctly to a colon list, too
-
-; COMMENTED OUT BECAUSE STRING-TOKENIZE IS MISSING (WILL BE FIXED)
-; OK
 (define (alist->env-test alist)
   (let ((old-env (env->alist)))       ; save old environment
     (alist->env alist)                ; set new environment
@@ -55,16 +66,14 @@
 		   (alist-compress alist))))
       (alist->env old-env)       ; restore old environment
       result)))
-
+; (add-test! 'alist->env 'env alist->env-test (cons '("String-list" . ("String1" "String2" "String3")) alist))
 
 ; NOTE: since alist-bla works only on alists, string-list / colon-list-conversion is not implemented
-; OK 2001-04-09 16:21
 (define (alist-delete-test key alist)
   (not (member key (map car (alist-delete key alist)))))
-
+(add-test! 'alist-delete 'env alist-delete-test "Test-EDITOR" alist)
 
 ; results #t, if the first occurance of the variable has the expected (new) value, else #f
-; OK 2001-04-09 16:15
 (define (alist-update-test key val alist)
   (letrec ((check-update (lambda (alist)
 			   (if (null? alist)         ; if alist is empty key wasn't inserted
@@ -76,10 +85,9 @@
 				       #f)
 				   (check-update (cdr alist)))))))
     (check-update (alist-update key val alist))))
-
+(add-test! 'alist-update 'env alist-update-test "Test-EDITOR" "HisEditor" alist)
 
 ; checks compression of every variable
-; OK 2001-04-09 15:46
 (define (alist-compress-test alist)
   (letrec ((check-compress (lambda (alist known-vars)
 			     (if (null? alist)
@@ -90,22 +98,39 @@
 						     (cons (caar alist)
 							   known-vars)))))))
     (check-compress (alist-compress alist) '())))
+(add-test! 'alist-compress 'env alist-compress-test alist)
 
+; Helper that updates the environment env-alist via env-alist-delta
+; NOTE: Test alist-update first (run alist-update-test key val alist)
+(define update-env
+  (lambda (env-alist env-alist-delta)
+    (if (null? env-alist-delta)
+	env-alist
+	(update-env (alist-update (car (car env-alist-delta))
+				  (cdr (car env-alist-delta))
+				  env-alist)
+		    (cdr env-alist-delta)))))
 
-
-; OK 2001-04-09 15:46
 (define (with-env*-test env-alist-delta)
   (with-env*-test-generator with-env*
 			    env-alist-delta
 			    (update-env (env->alist) env-alist-delta)))
+(add-test! 'with-env* 'env with-env*-test alist)
 
-; OK 2001-04-09 15:45
 (define (with-total-env*-test env-alist)
   (with-env*-test-generator with-total-env*
 			    env-alist
 			    env-alist))
+(add-test! 'with-total-env* 'env with-total-env*-test alist)
 
-; generator:
+; -----------------------------------------------------------------------------
+
+; compares old-env-alist with actual environment (env->alist)
+(define	equal-to-current-env?
+  (lambda (old-env-alist)
+    (list-equal? old-env-alist (env->alist))))
+    
+; Helper generator:
 ; There are three tests for each circumstance (s. scsh manual for details)
 ; * simple thunk:             returns usually
 ; * non-local-return thunk:   returns using escape-procedure
@@ -116,7 +141,6 @@
 ; if the test returned #t, returns #t if the current environment is as expected.
 ; (there are two test for the current-environment necessary since the environment
 ; during the call and after the call differ (s. manual for details))
-; OK 2001-04-09 15:45
 ; the generator generates test-procedures for with-total-env* and with-env*
 ; parameters are:
 ; - call:                 either with-total-env* or with-env*
@@ -174,17 +198,15 @@
 ; don't change the current environment (if successful)
 
 ; checks if home-directory is a string
-; OK 2001-04-09 15:45
 (define (home-directory-test)
   (string? home-directory))
+(add-test! 'home-directory 'env home-directory-test)
 
 ; checks if exec-path-list is a string-list
-; OK 2001-04-09 15:45
 (define (exec-path-list-test)
   (string-list? (thread-fluid exec-path-list)))
+(add-test! 'exec-path-list 'env exec-path-list-test)
 
-
-; OK 2001-04-09 15:45
 (define (add-tester elt mark original-list add-result)
   (letrec ((correct-insert
             (lambda (add-result)		; checks if elt was inserted correctly
@@ -218,15 +240,18 @@
 ; OK 2001-04-09 15:44
 (define (add-before-test elt before liste)
   (add-tester elt before liste (add-before elt before liste)))
+(add-test! 'add-before-infix 'env add-before-test "Drei" "Vier" number-list)
+(add-test! 'add-before-suffix 'env add-before-test "F�nf" "Sechs" number-list)
 
 ; add-after operates as add-before on reverse list
-; OK 2001-04-09 15:44
 (define (add-after-test elt after liste) 
   (add-tester elt after liste (reverse (add-after elt after (reverse liste)))))
+(add-test! 'add-after-infix 'env add-after-test "Drei" "Zwei" number-list)
+(add-test! 'add-after-prefix 'env add-after-test "Null" "Null" number-list)
+(add-test! 'add-after-prefix 'env add-after-test "Drei" "Zwei" number-list)
 
 ; helping procedures *************************************************************
 ; returns #t if liste is a list containing only strings, else #f
-; OK
 (define string-list?
   (lambda (liste)
     (and (list? liste)
@@ -235,7 +260,6 @@
 		liste))))
 
 ; deletes equal-to-this once in list, if present
-; OK
 (define (delete-once equal-to-this list)
   (if (null? list)
       '()
@@ -250,7 +274,6 @@
 ; => #t
 ; (list-equal? '(1 2) '(2 1 1)
 ; #f
-; OK
 (define (list-equal? list1 list2)
   (if (null? list1)
       (null? list2)
@@ -258,22 +281,3 @@
           (list-equal? (cdr list1)
 		       (delete-once (car list1) list2))
           #f)))
-
-; updates the environment env-alist via env-alist-delta
-; NOTE: Test alist-update first (run alist-update-test key val alist)
-; OK
-(define update-env
-  (lambda (env-alist env-alist-delta)
-    (if (null? env-alist-delta)
-	env-alist
-	(update-env (alist-update (car (car env-alist-delta))
-				  (cdr (car env-alist-delta))
-				  env-alist)
-		    (cdr env-alist-delta)))))
-
-
-; compares old-env-alist with actual environment (env->alist)
-; OK
-(define	equal-to-current-env?
-  (lambda (old-env-alist)
-    (list-equal? old-env-alist (env->alist))))

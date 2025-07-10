@@ -1,6 +1,6 @@
 ;;; Terminal Device Control Tests ---------------------------------------------
 ;; Part of scsh 1.0. See file COPYING for notices and license.
-;; Tests for scsh's TTY and PTY controlling fascilities. 
+;; Tests scsh's TTY and PTY controlling fascilities. 
 ;; Extends work done by Christoph Hetz
 
 ;; Note that these tests expect stdio to be connected to TTY
@@ -104,20 +104,20 @@
 (add-test! 'open-pty 'terminal-device-control open-pty-test)
 
 ;; (fork-pty-session thunk)
-(define (fork-pty-session-test)
-	(receive (process pty-in pty-out tty-name)
-    	(fork-pty-session 
-			(lambda () 
-				(let ((inp (read)))
-					(write (string-append inp inp)))
-				(newline)))
-		(write "hello" pty-out)
-		(newline pty-out)
-	  	(force-output pty-out)
-		(let ((reply (read pty-in)))
-			(close-output-port pty-out) ;; necessary on some systems for proper exit
-			(string=? "hellohello" reply))))
-(add-test! 'fork-pty-session 'terminal-device-control fork-pty-session-test)
+; (define (fork-pty-session-test)
+; 	(receive (process pty-in pty-out tty-name)
+;     	(fork-pty-session 
+; 			(lambda () 
+; 				(let ((inp (read)))
+; 					(write (string-append inp inp)))
+; 				(newline)))
+; 		(write "hello" pty-out)
+; 		(newline pty-out)
+; 	  	(force-output pty-out)
+; 		(let ((reply (read pty-in)))
+; 			(close-output-port pty-out) ;; necessary on some systems for proper exit
+; 			(string=? "hellohello" reply))))
+; (add-test! 'fork-pty-session 'terminal-device-control fork-pty-session-test)
 
 ;; (set-tty-info/now info [fd/port/fname])
 ;; (set-tty-info/drain info [fd/port/fname])
@@ -166,140 +166,140 @@
 
 ;; Constants
 
-; (add-test! 'tty-info-record-posix-indicies-test 'terminal-device-control
-;   (lambda ()
-;     (and ttychar/delete-char
-; 	 ttychar/delete-line
-; 	 ttychar/eof
-; 	 ttychar/eol
-; 	 ttychar/interrupt
-; 	 ttychar/quit
-; 	 ttychar/suspend
-; 	 ttychar/start
-; 	 ttychar/stop)))
+(add-test! 'tty-info-record-posix-indicies-test 'terminal-device-control
+  (lambda ()
+    (and ttychar/delete-char
+	 ttychar/delete-line
+	 ttychar/eof
+	 ttychar/eol
+	 ttychar/interrupt
+	 ttychar/quit
+	 ttychar/suspend
+	 ttychar/start
+	 ttychar/stop)))
 
-; (add-test! 'tty-info-record-posix-input-flags 'terminal-device-control
-;   (lambda ()
-;     (and ttyin/check-parity
-; 	 ttyin/ignore-bad-parity-chars
-; 	 ttyin/mark-parity-errors
-; 	 ttyin/ignore-break
-; 	 ttyin/interrupt-on-break
-; 	 ttyin/7bits
-; 	 ttyin/cr->nl
-; 	 ttyin/ignore-cr
-; 	 ttyin/nl->cr
-; 	 ttyin/input-flow-ctl
-; 	 ttyin/output-flow-ctl)))
+(add-test! 'tty-info-record-posix-input-flags 'terminal-device-control
+  (lambda ()
+    (and ttyin/check-parity
+	 ttyin/ignore-bad-parity-chars
+	 ttyin/mark-parity-errors
+	 ttyin/ignore-break
+	 ttyin/interrupt-on-break
+	 ttyin/7bits
+	 ttyin/cr->nl
+	 ttyin/ignore-cr
+	 ttyin/nl->cr
+	 ttyin/input-flow-ctl
+	 ttyin/output-flow-ctl)))
 
-; (add-test! 'tty-info-record-posix-output-flags 'terminal-device-control
-;   (lambda ()
-;     ttyout/enable))
+(add-test! 'tty-info-record-posix-output-flags 'terminal-device-control
+  (lambda ()
+    ttyout/enable))
 
-; (add-test! 'tty-info-record-delay-constants-for-output-flags 'terminal-device-control
-;   (lambda ()
-;     (or (and ttyout/bs-delay
-; 	     ttyout/bs-delay0
-; 	     ttyout/bs-delay1
-; 	     ttyout/cr-delay
-; 	     ttyout/cr-delay0
-; 	     ttyout/cr-delay1
-; 	     ttyout/cr-delay2
-; 	     ttyout/cr-delay3
-; 	     ttyout/ff-delay
-; 	     ttyout/ff-delay0
-; 	     ttyout/ff-delay1
-; 	     ttyout/tab-delay
-; 	     ttyout/tab-delay0
-; 	     ttyout/tab-delay1
-; 	     ttyout/tab-delay2
-; 	     ttyout/tab-delayx
-; 	     ttyout/nl-delay
-; 	     ttyout/nl-delay0
-; 	     ttyout/nl-delay1
-; 	     ttyout/vtab-delay
-; 	     ttyout/vtab-delay0
-; 	     ttyout/vtab-delay1
-; 	     ttyout/all-delay)
-; 	(not (and ttyout/bs-delay
-; 		  ttyout/bs-delay0
-; 		  ttyout/bs-delay1
-; 		  ttyout/cr-delay
-; 		  ttyout/cr-delay0
-; 		  ttyout/cr-delay1
-; 		  ttyout/cr-delay2
-; 		  ttyout/cr-delay3
-; 		  ttyout/ff-delay
-; 		  ttyout/ff-delay0
-; 		  ttyout/ff-delay1
-; 		  ttyout/tab-delay
-; 		  ttyout/tab-delay0
-; 		  ttyout/tab-delay1
-; 		  ttyout/tab-delay2
-; 		  ttyout/tab-delayx
-; 		  ttyout/nl-delay
-; 		  ttyout/nl-delay0
-; 		  ttyout/nl-delay1
-; 		  ttyout/vtab-delay
-; 		  ttyout/vtab-delay0
-; 		  ttyout/vtab-delay1
-; 		  ttyout/all-delay)))))
+(add-test! 'tty-info-record-delay-constants-for-output-flags 'terminal-device-control
+  (lambda ()
+    (or (and ttyout/bs-delay
+	     ttyout/bs-delay0
+	     ttyout/bs-delay1
+	     ttyout/cr-delay
+	     ttyout/cr-delay0
+	     ttyout/cr-delay1
+	     ttyout/cr-delay2
+	     ttyout/cr-delay3
+	     ttyout/ff-delay
+	     ttyout/ff-delay0
+	     ttyout/ff-delay1
+	     ttyout/tab-delay
+	     ttyout/tab-delay0
+	     ttyout/tab-delay1
+	     ttyout/tab-delay2
+	     ttyout/tab-delayx
+	     ttyout/nl-delay
+	     ttyout/nl-delay0
+	     ttyout/nl-delay1
+	     ttyout/vtab-delay
+	     ttyout/vtab-delay0
+	     ttyout/vtab-delay1
+	     ttyout/all-delay)
+	(not (and ttyout/bs-delay
+		  ttyout/bs-delay0
+		  ttyout/bs-delay1
+		  ttyout/cr-delay
+		  ttyout/cr-delay0
+		  ttyout/cr-delay1
+		  ttyout/cr-delay2
+		  ttyout/cr-delay3
+		  ttyout/ff-delay
+		  ttyout/ff-delay0
+		  ttyout/ff-delay1
+		  ttyout/tab-delay
+		  ttyout/tab-delay0
+		  ttyout/tab-delay1
+		  ttyout/tab-delay2
+		  ttyout/tab-delayx
+		  ttyout/nl-delay
+		  ttyout/nl-delay0
+		  ttyout/nl-delay1
+		  ttyout/vtab-delay
+		  ttyout/vtab-delay0
+		  ttyout/vtab-delay1
+		  ttyout/all-delay)))))
 
-; (add-test! 'tty-info-record-posix-control-flags 'terminal-device-control
-;   (lambda ()
-;     (and ttyc/char-size
-; 	 ttyc/char-size5
-; 	 ttyc/char-size6
-; 	 ttyc/char-size7
-; 	 ttyc/char-size8
-; 	 ttyc/enable-parity
-; 	 ttyc/odd-parity
-; 	 ttyc/enable-read
-; 	 ttyc/hup-on-close
-; 	 ttyc/no-modem-sync
-; 	 ttyc/2-stop-bits)))
+(add-test! 'tty-info-record-posix-control-flags 'terminal-device-control
+  (lambda ()
+    (and ttyc/char-size
+	 ttyc/char-size5
+	 ttyc/char-size6
+	 ttyc/char-size7
+	 ttyc/char-size8
+	 ttyc/enable-parity
+	 ttyc/odd-parity
+	 ttyc/enable-read
+	 ttyc/hup-on-close
+	 ttyc/no-modem-sync
+	 ttyc/2-stop-bits)))
 
-; (add-test! 'tty-info-record-4.3+bsd-control-flags 'terminal-device-control
-;   (lambda ()
-;     (or (and ttyc/ignore-flags
-; 	     ttyc/CTS-output-flow-ctl
-; 	     ttyc/RTS-input-flow-ctl
-; 	     ttyc/carrier-flow-ctl)
-; 	(not (and ttyc/ignore-flags
-; 		  ttyc/CTS-output-flow-ctl
-; 		  ttyc/RTS-input-flow-ctl
-; 		  ttyc/carrier-flow-ctl)))))
+(add-test! 'tty-info-record-4.3+bsd-control-flags 'terminal-device-control
+  (lambda ()
+    (or (and ttyc/ignore-flags
+	     ttyc/CTS-output-flow-ctl
+	     ttyc/RTS-input-flow-ctl
+	     ttyc/carrier-flow-ctl)
+	(not (and ttyc/ignore-flags
+		  ttyc/CTS-output-flow-ctl
+		  ttyc/RTS-input-flow-ctl
+		  ttyc/carrier-flow-ctl)))))
 
-; (add-test! 'tty-info-record-posix-local-flags 'terminal-device-control
-;   (lambda ()
-;     (and ttyl/canonical
-; 	 ttyl/echo
-; 	 ttyl/echo-delete-line
-; 	 ttyl/echo-nl
-; 	 ttyl/visual-delete
-; 	 ttyl/enable-signals
-; 	 ttyl/extended
-; 	 ttyl/no-flush-on-interrupt
-; 	 ttyl/ttou-signal)))
+(add-test! 'tty-info-record-posix-local-flags 'terminal-device-control
+  (lambda ()
+    (and ttyl/canonical
+	 ttyl/echo
+	 ttyl/echo-delete-line
+	 ttyl/echo-nl
+	 ttyl/visual-delete
+	 ttyl/enable-signals
+	 ttyl/extended
+	 ttyl/no-flush-on-interrupt
+	 ttyl/ttou-signal)))
 
-; (add-test! 'tty-info-record-svr4&4.3+bsd-local-flags 'terminal-device-control
-;   (lambda ()
-;     (or (and ttyl/echo-ctl
-; 	     ttyl/flush-output
-; 	     ttyl/hardcopy-delete
-; 	     ttyl/reprint-unread-chars
-; 	     ttyl/visual-delete-line
-; 	     ttyl/alt-delete-word
-; 	     ttyl/no-kernel-status
-; 	     ttyl/case-map)
-; 	(not (and ttyl/echo-ctl
-; 		  ttyl/flush-output
-; 		  ttyl/hardcopy-delete
-; 		  ttyl/reprint-unread-chars
-; 		  ttyl/visual-delete-line
-; 		  ttyl/alt-delete-word
-; 		  ttyl/no-kernel-status
-; 		  ttyl/case-map)))))
+(add-test! 'tty-info-record-svr4&4.3+bsd-local-flags 'terminal-device-control
+  (lambda ()
+    (or (and ttyl/echo-ctl
+	     ttyl/flush-output
+	     ttyl/hardcopy-delete
+	     ttyl/reprint-unread-chars
+	     ttyl/visual-delete-line
+	     ttyl/alt-delete-word
+	     ttyl/no-kernel-status
+	     ttyl/case-map)
+	(not (and ttyl/echo-ctl
+		  ttyl/flush-output
+		  ttyl/hardcopy-delete
+		  ttyl/reprint-unread-chars
+		  ttyl/visual-delete-line
+		  ttyl/alt-delete-word
+		  ttyl/no-kernel-status
+		  ttyl/case-map)))))
 
 
 

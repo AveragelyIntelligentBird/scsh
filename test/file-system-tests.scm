@@ -1,5 +1,9 @@
-;;; Tests for the function in section 3.3 of the scsh-manual "File system"
-;;; Author: David Frese
+;;; File System Tests ---------------------------------------------------------
+;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Extends work done by David Frese
+
+;;; Test code -----------------------------------------------------------------
+;; All procedures return either #t or #f
 
 ; file-type: don't know how to test block-special, char-special
 ;	   socket should be tested in section "Networking"!!
@@ -11,7 +15,6 @@
 ; glob: hard work ??
 ; temp-file-iterate: could it be ignored?? create-temp-file uses it anyway??
 ; temp-file-channel: ??
-
 
 (define create-temp-dir
   (let ((temp-dir "/tmp/scsh-test/"))
