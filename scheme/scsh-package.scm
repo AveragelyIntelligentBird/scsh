@@ -51,7 +51,7 @@
 
 (define-structure string-collectors string-collectors-interface
   (open scheme srfi-9)
-  (files stringcoll))
+  (files (ports stringcoll)))
 
 (define-structure thread-fluids thread-fluids-interface
   (open scheme srfi-9 weak
@@ -542,7 +542,7 @@
         (subset i/o (current-error-port))
         (subset scsh-utilities (define-simple-syntax))
         scsh-fdports)
-  (files stdio))
+  (files (ports stdio)))
 
 (define-structure scsh-ptys scsh-ptys-interface
   (open (modify scheme (hide call-with-input-file

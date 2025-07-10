@@ -88,6 +88,8 @@ SCHEME = scheme/command-line.scm \
 	 scheme/ports/fdport-ops.scm \
 	 scheme/ports/port-collect.scm \
 	 scheme/ports/bufpol.scm \
+	 scheme/ports/stdio.scm \
+	 scheme/ports/stringcoll.scm \
 	 scheme/process-high-level.scm \
 	 scheme/process-state.scm \
 	 scheme/process.scm \
@@ -102,8 +104,6 @@ SCHEME = scheme/command-line.scm \
 	 scheme/scsh-version.scm \
 	 scheme/signal.scm \
 	 scheme/startup.scm \
-	 scheme/stdio.scm \
-	 scheme/stringcoll.scm \
 	 scheme/syntax-helpers.scm \
 	 scheme/syntax.scm \
 	 scheme/system.scm \
