@@ -242,18 +242,24 @@
   (files (ports fdport-internal)))
 
 (define-structure scsh-fdports (compound-interface scsh-fdports-interface scsh-bufpol-interface) 
-  (open (modify scheme (rename (char-ready?  s48-char-ready?)
-                               (read-char    s48-read-char)
-                               (display      s48-display)
-                               (newline      s48-newline)
-                               (write        s48-write)
-                               (write-char   s48-write-char))
-                (hide call-with-input-file
+  (open (modify scheme
+                (hide write-char
+                      write
+                      newline
+                      display
+                      peek-char
+                      read-char
+                      char-ready?
+                      call-with-input-file
                       call-with-output-file
                       with-input-from-file
                       with-output-to-file
                       open-input-file
                       open-output-file))
+        (subset unicode (scalar-value->char))
+        (subset methods (disclose))
+        (subset code-vectors (code-vector?))
+        ascii
         scsh-fdport-internal
         scsh-bufpol
         debug-messages
@@ -274,7 +280,9 @@
         (modify i/o (hide force-output
                           char-ready?
                           read-char
+                          peek-char
                           newline
+                          write-string
                           write-char)
                 (rename (force-output s48-force-output)))
         (modify formats (rename (format s48-format))
@@ -311,8 +319,7 @@
                                          search-tree-ref))
         (subset condvars (make-condvar condvar-value))
         text-codecs
-        (modify extended-ports
-          (rename (make-string-output-port s48-make-string-output-port)))
+        extended-ports
         scsh-utilities
         signals
         threads
@@ -323,7 +330,7 @@
         (subset external-calls (import-lambda-definition-2))
         byte-vectors
         session-data) 
-  (files (ports fdports) (ports fdport-ops)))
+  (files (ports fdports) (ports fdport-ops) (ports core-io-ops) (ports format-str)))
 
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs
@@ -339,6 +346,7 @@
                              char-ready?
                              read-char
                              write-char
+                             peek-char
                              newline
                              open-input-file
                              open-output-file))
@@ -348,6 +356,8 @@
         (modify i/o (hide force-output
                           newline
                           write-char
+                          peek-char
+                          write-string
                           char-ready?
                           read-char))
         (modify posix-files (hide file-type
@@ -374,6 +384,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              open-input-file
@@ -456,6 +467,7 @@
                              display
                              newline
                              write-char
+                             peek-char
                              char-ready?
                              read-char
                              open-input-file
@@ -463,6 +475,8 @@
         (modify i/o (hide force-output
                           newline
                           write-char
+                          peek-char
+                          write-string
                           char-ready?
                           read-char))
         escapes
@@ -500,6 +514,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              open-input-file
@@ -507,6 +522,7 @@
         (modify i/o (hide write-string
                           force-output
                           newline
+                          peek-char
                           write-char
                           char-ready?
                           read-char))
@@ -535,6 +551,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              open-input-file
@@ -553,6 +570,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              open-input-file
@@ -612,6 +630,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              open-input-file
@@ -696,6 +715,7 @@
                              with-output-to-file
                              write
                              display
+                             peek-char
                              char-ready?
                              read-char
                              write-char
@@ -704,7 +724,7 @@
                              open-output-file))
         formats
         string-collectors
-        (modify extended-ports (hide make-string-output-port)) ; redefined
+        extended-ports
         receiving
         bitwise
         delimited-readers
@@ -783,6 +803,7 @@
         (modify primitives (hide wait
                                  write-char
                                  read-char
+                                 peek-char
                                  time))
         os-strings
         scsh-reader
@@ -791,6 +812,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              call-with-input-file
@@ -809,6 +831,7 @@
                              with-output-to-file
                              write
                              display
+                             peek-char
                              char-ready?
                              read-char
                              write-char
@@ -839,6 +862,7 @@
                           force-output
                           newline
                           write-char
+                          peek-char
                           char-ready?
                           read-char))
         package-commands-internal
@@ -939,6 +963,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              char-lower-case?
@@ -1061,6 +1086,7 @@
                              with-output-to-file
                              write
                              display
+                             peek-char
                              char-ready?
                              read-char
                              write-char
@@ -1103,6 +1129,7 @@
                              display
                              char-ready?
                              read-char
+                             peek-char
                              write-char
                              newline
                              map
@@ -1132,5 +1159,6 @@
                              write
                              newline
                              read-char
+                             peek-char
                              display
                              write-char))))

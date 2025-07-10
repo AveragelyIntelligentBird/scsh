@@ -77,9 +77,6 @@
 	  with-current-error-port*
 	  with-current-input-port*
 	  close-after
-	  with-current-error-port
-	  with-current-output-port
-	  flush-all-ports
 	  error-output-port
 	  close
 	  release-port-handle
@@ -93,12 +90,18 @@
 	  tell
 	  seek
 	  port->fdes
-	  char-ready?
-	  read-char
-	  display write newline write-char
-    sanity-write-char
-    sanity-write-string
-    make-string-output-port       ;; Redefines s48
+
+    ; read
+    read-char
+    char-ready?
+    peek-char
+    write-char
+    newline
+    display 
+    write
+    write-string 
+    format
+
 	  force-output
 	  open-input-file
 	  with-output-to-file with-input-from-file
@@ -149,17 +152,20 @@
           seek/end
 
           flush-all-ports
-          flush-all-ports-no-threads
-          ;; R4RS I/O procedures that scsh provides.
-          write
-          char-ready?
-          read-char
-          write-char
-          sanity-write-char
-          sanity-write-string
+          flush-all-ports-no-threads          
           set-port-buffering
-          display
+          
+          ; read
+          read-char
+          char-ready?
+          peek-char
+          write-char
           newline
+          display 
+          write 
+          write-string
+          format  
+
           input-port?
           output-port?
           call-with-input-file
@@ -168,7 +174,6 @@
           with-output-to-file
           open-input-file
           open-output-file
-          format
 
           fork-pty-session
           open-pty

@@ -253,87 +253,13 @@
       #t ; EBADF should not occur if there is a port
       (%close-fdes fd)))
 
+(define (force-output . maybe-i/o) 
+  (let ((stream (:optional maybe-i/o (current-output-port))))
+    (if (output-port? stream) (s48-force-output stream)
+        (values))))
+
 (define (flush-fdport fdport)
   (force-output (check-arg fdport? fdport flush-fdport)))
-
-;;; Extend R4RS i/o ops to handle file descriptors.
-;;; -----------------------------------------------
-;;; Will probably need to limit buffers somehow..
-
-(define-simple-syntax
-  (define-r4rs-input (name arg ...) stream s48name body ...)
-  (define (name arg ... . maybe-i/o)
-    (let ((stream (:optional maybe-i/o (current-input-port))))
-      (cond ((input-port? stream) (s48name arg ... stream))
-            ((integer? stream) body ...)
-            (else (error "Not a port or file descriptor" stream))))))
-
-(define-r4rs-input (char-ready?) input s48-char-ready?
-  (%char-ready-fdes? input))
-
-(define-r4rs-input (read-char) input s48-read-char
-  (let ((port (fdes->inport input)))
-    (s48-read-char port)))
-
-(define-simple-syntax
-  (define-r4rs-output (name arg ...) stream s48name body ...)
-  (define (name arg ... . maybe-i/o)
-    (let ((stream (:optional maybe-i/o (current-output-port))))
-      (cond ((output-port? stream) (s48name arg ... stream))
-            ((integer? stream) body ...)
-            (else (error "Not an outport or file descriptor" stream))))))
-
-;; s48 has a bug: the default text codec for new ports is latin-1,
-;; while the reference suggests it should be utf-8; we definitely prefer utf-8
-;; We will manually reset the codec for port-creating forms exposed to user
-(define (make-string-output-port) 
-  (let ((sp (s48-make-string-output-port)))
-    (set-port-text-codec! sp utf-8-codec) 
-    sp))
-;; For (make-string-input-port string), s48 *does* set encoding to utf-8 ¯\_(ツ)_/¯
-;; (call-with-string-output-port proc) and (string-output-port-output port)
-;;   implicitly read data as utf-8, so we fine 
-
-;;; This one depends upon S48's string ports.
-(define-r4rs-output (display object) output s48-display
-  (let ((sp (make-string-output-port)))
-    (display object sp)
-    (write-string (string-output-port-output sp) output)))
-
-(define-r4rs-output (newline) output s48-newline
-  (let ((port (fdes->outport output)))
-    (s48-newline port)))
-
-(define-r4rs-output (write object) output s48-write
-  (let ((sp (make-string-output-port)))
-    (write object sp)
-    (write-string (string-output-port-output sp) output)))
-
-(define-r4rs-output (write-char char) output s48-write-char
-  (let ((port (fdes->outport output)))
-    (s48-write-char char port)))
-
-; TODO replace the faulty write chars with an actually correct thing wat
-(define (sanity-write-char char port) 
-  ((port-handler-char (port-handler port)) port char)
-  (unspecific))
-
-(define (sanity-write-string string port) 
-  (let ((write-ch (port-handler-char (port-handler port)))
-        (len (string-length string)))
-  (do ((i 0 (+ i 1)))
-      ((>= i len))
-        (write-ch port (string-ref string i)))
-  (newline port)))
-
-;;; S48's force-output doesn't default to forcing (current-output-port).
-(define-r4rs-output (force-output) output s48-force-output
-  (values)) ; Do nothing if applied to a file descriptor.
-
-(define (format dest cstring . args)
-  (if (integer? dest)
-      (write-string (apply s48-format #f cstring args) dest)
-      (apply s48-format dest cstring args)))
 
 ;;; with-current-foo-port procs
 ;;; ---------------------------

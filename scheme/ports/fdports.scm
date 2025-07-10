@@ -183,7 +183,7 @@
 
 ;;; Flushes all output fdports
 (define (flush-all-ports)
-  (let ((thunks (output-fdport-forcers #f))) ; TODO - is it a good idea to only do fdports?
+  (let ((thunks (output-fdport-forcers #f))) 
     (cond ((null? thunks)
            #f)
           (else
@@ -213,7 +213,7 @@
 
 ;;; Bare-bones flush; used at system exit
 (define (flush-all-ports-no-threads)
-  (let ((thunks (append (output-fdport-forcers #f) (output-port-forcers #f)))) ; Flushes fdports and s48 ports (stdio) - TODO, revise all to be fdports?
+  (let ((thunks (output-fdport-forcers #f))) 
     (for-each (lambda (thunk) (thunk)) thunks)))
 
 ;;; System initialization

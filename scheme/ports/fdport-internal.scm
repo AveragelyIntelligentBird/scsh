@@ -296,7 +296,7 @@
 				0
 				0)))
 	(set-port-crlf?! port (channel-crlf?))
-	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug where new ports are latin-1
 	port))
 
 ;;; Output fdport handler + real port maker
@@ -579,7 +579,7 @@
 	(register-flushable-port! port)
 	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
 	(set-port-crlf?! port (channel-crlf?))
-	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug - new ports are latin-1
+	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug where new ports are latin-1
 	port))
 
 ;;; Output fdport flush controls
