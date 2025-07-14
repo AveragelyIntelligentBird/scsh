@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@title{Networking}
+@title[#:tag "networking-chapter"]{Networking}
 
 @local-table-of-contents[]
 

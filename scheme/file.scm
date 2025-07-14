@@ -67,4 +67,4 @@
   (if (output-port? fd/port) (force-output fd/port))
   (sleazy-call/fdes fd/port %sync-file))
 
-(define sync-file-system %sync-file-system)
+

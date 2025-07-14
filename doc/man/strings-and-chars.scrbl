@@ -1,6 +1,6 @@
 #lang scribble/manual
 
-@title{Strings and characters}
+@title[#:tag "manipulating-filenames"]{Strings and characters}
 
 @local-table-of-contents[]
 

@@ -3,6 +3,8 @@
 
 @title{I/O}
 
+<current approach is fully modular with regards to s48, it is not optimized for speed>
+
 @section{Standard RnRS I/O Procedures}
 In scsh, most standard RnRS I/O operations (such as @code{display} or @code{read-char}) work on both
 integer file descriptors and Scheme ports. When doing I/O with a file descriptor, the I/O operation

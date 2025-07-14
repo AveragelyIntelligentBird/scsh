@@ -35,7 +35,7 @@
 	  %set-file-uid&gid %set-fdes-uid&gid
 	  %utime %utime-now
 	  %stat-file %stat-fdes
-	  %sync-file %sync-file-system))
+	  %sync-file))
 
 (define-interface scsh-fdport-internal-interface
   (export 
@@ -310,8 +310,7 @@
           file-not-exists?
           file-exists?
 
-          sync-file
-          sync-file-system))
+          sync-file))
 
 (define-interface scsh-globbing-interface
   (export glob
