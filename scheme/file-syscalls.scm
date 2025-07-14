@@ -57,6 +57,3 @@
 (import-lambda-definition-2 %file-ruid-access-not-raw? (path perms) "scsh_access")
 
 (define/vector-args %file-ruid-access-not? %file-ruid-access-not-raw? (path) perms)
-
-;;; Amazingly bogus syscall -- doesn't *actually* sync the filesys.
-(import-lambda-definition-2 %sync-file-system (fd) "scsh_fsync")

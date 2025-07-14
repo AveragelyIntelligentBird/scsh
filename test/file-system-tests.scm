@@ -13,7 +13,7 @@
 ; sync-file: Test is not very stable, I guess??
 ;
 ; glob: hard work ??
-; temp-file-iterate: could it be ignored?? create-temp-file uses it anyway??
+; temp-file-iterate: can be ignored, create-temp-file uses it anyway
 ; temp-file-channel: ??
 
 (define create-temp-dir
