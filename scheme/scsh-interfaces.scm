@@ -948,13 +948,19 @@
 ;;           with-dot-lock*))
 
 (define-interface uname-interface
-  (export uname
+  (export uname uname? 
+          ; Reord field accessors
           uname:os-name
           uname:node-name
           uname:release
           uname:version
           uname:machine
-          :uname))
+          ; Individual syscalls
+          uname-os
+          uname-node
+          uname-release
+          uname-version
+          uname-machine))
 
 (define-interface md5-interface
   (export make-md5-context

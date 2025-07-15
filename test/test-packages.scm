@@ -54,12 +54,20 @@
   (open scsh-user
 	test-base)
   (begin
-    (add-test! 'uname 'system-parameter
+    (add-test! 'uname-direct 'system-parameters
+	       (lambda ()
+		 (and (> (string-length (uname-os)) 0)
+          (> (string-length (uname-node)) 0)
+          (> (string-length (uname-release)) 0)
+          (> (string-length (uname-version)) 0)
+          (> (string-length (uname-machine)) 0))))
+
+    (add-test! 'uname 'system-parameters
 	       (lambda ()
 		 (let ((uname-rec (uname)))
 		   (> (string-length (uname:node-name uname-rec)) 0))))
 
-    (add-test! 'system-name 'system-parameter
+    (add-test! 'system-name 'system-parameters
 	       (lambda ()
 		 (> (string-length (system-name)) 0)))))
 
