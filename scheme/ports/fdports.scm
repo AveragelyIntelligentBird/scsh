@@ -136,8 +136,8 @@
 ;;; Checks if x is a scsh fdport port, and is installed in *fdports*
 (define (fdport? x)
   (and (or (input-port? x) (output-port? x))
-       (fdport->channel x)  ; i.e. has OS-channel in the data field
-       (maybe-ref-fdport (fdport->fd x))))
+       (maybe-ref-fdport (fdport->fd x))
+       #t)) ; and returns last non-false val
 
 ;;; Checks if x is an fdport and it is currently open
 (define (open-fdport? x)
@@ -149,11 +149,6 @@
 (define (fd/port? x)
   (or (and (integer? x) (>= x 0))
       (fdport? x)))
-
-(define (fdport-open? port) ; TODO - do we need this?
-  (check-arg fdport? port fdport-open?)
-  (eq? (channel-status (fdport->channel port))
-       (enum channel-status-option closed)))
 
 ;;; Port-reveal getters and setters
 ;;; ------------------------

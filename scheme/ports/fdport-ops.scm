@@ -70,7 +70,45 @@
 ;;; Port/fd ops
 ;;; ----------------------------------
 
-;;; Decrements port revealed count
+; Not Exported ;
+;; Given fdes, return a port with (revealed count++)
+; Lookup by port by fdes, incrementing revealed count
+;  OR make a new port with revealed count of 1 
+(define (fdes->port fd port-maker)  
+  (cond  ((maybe-ref-fdport-port fd) =>
+          (lambda (p)
+            (increment-revealed-count p 1)
+            p))
+         (else (port-maker fd 1 
+                (string-append "<fdes->port on fd " (number->string fd) ">")))))
+
+;; Gets a port mapped to given fd + increments the revealed count
+(define (fdes->inport fd)
+  (let ((port (fdes->port fd make-input-fdport/fd)))
+    (if (not (input-port? port))
+        (error "fdes was already assigned to an outport" fd)
+        port)))
+
+;; Gets a port mapped to given fd + increments the revealed count
+(define (fdes->outport fd)
+  (let ((port (fdes->port fd make-output-fdport/fd)))
+    (if (not (output-port? port))
+        (error "fdes was already assigned to an inport" fd)
+        port)))
+
+;; Gets an fd associated with port + increments the revealed count
+(define (port->fdes port)
+  (check-arg open-fdport? port port->fdes)
+  (increment-revealed-count port 1)
+  (fdport->fd port))
+
+;; Gets the port revealed count
+(define (port-revealed port)
+  (check-arg fdport? port port-revealed)
+  (let ((count (fdport:revealed port)))
+    (and (not (zero? count)) count)))
+
+;; Decrements port revealed count
 (define (release-port-handle port)
   (check-arg fdport? port release-port-handle)
   (atomically!
@@ -79,43 +117,10 @@
          (let ((new-rev (- rev 1)))
            (set-fdport:revealed! port new-rev))))))
 
-;;; Gets the port revealed count
-(define (port-revealed port)
-  (let ((count (fdport:revealed (check-arg fdport? port port-revealed))))
-    (and (not (zero? count)) count)))
-
-(define (fdes->port fd port-maker) ; local proc.
-  (cond  ((maybe-ref-fdport-port fd) =>
-          (lambda (p)
-            (increment-revealed-count p 1)
-            p))
-         (else (port-maker fd 1 
-                (string-append "<fdes->port on fd " (number->string fd) ">")))))
-
-;;; Gets a port mapped to given fd + increments the revealed count
-(define (fdes->inport fd)
-  (let ((port (fdes->port fd make-input-fdport/fd)))
-    (if (not (input-port? port))
-        (error "fdes was already assigned to an outport" fd)
-        port)))
-
-;;; Gets a port mapped to given fd + increments the revealed count
-(define (fdes->outport fd)
-  (let ((port (fdes->port fd make-output-fdport/fd)))
-    (if (not (output-port? port))
-        (error "fdes was already assigned to an inport" fd)
-        port)))
-
-;;; Gets an fd associated with port + increments the revealed count
-(define (port->fdes port)
-  (check-arg open-fdport? port port->fdes)
-  (increment-revealed-count port 1)
-  (fdport->fd port))
-
-;;; Calls consumer on a file descriptor; takes care of revealed bookkeeping. 
-;; If fd/port is a file descriptor, this is just (consumer fd/port). 
-;; If fd/port is a port, calls consumer on its underlying file descriptor. 
-;; While consumer is running, the port's revealed count is incremented.
+;; Calls consumer on a file descriptor; takes care of revealed bookkeeping. 
+; If fd/port is a file descriptor, this is just (consumer fd/port). 
+; If fd/port is a port, calls consumer on its underlying file descriptor. 
+; While consumer is running, the port's revealed count is incremented.
 (define (call/fdes fd/port consumer)
   (cond ((integer? fd/port)
          (consumer fd/port))
@@ -130,65 +135,47 @@
               (set! port #f)))))
         (else (error "Not a file descriptor or fdport." fd/port))))
 
-;;; Don't mess with the revealed count in the port case
-;;; -- just sneakily grab the fdes and run.
+; Not Exported ;
+;; Don't mess with the revealed count in the port case
+; -- just sneakily grab the fdes and run.
 (define (sleazy-call/fdes fd/port proc)
   (proc (cond ((integer? fd/port) fd/port)
               ((fdport? fd/port) (fdport->fd fd/port))
               (else (error "Not a file descriptor or fdport." fd/port)))))
 
-;;; Moves an i/o handle FD/PORT to fd TARGET.
-;;; - If FD/PORT is a file descriptor, this is dup2(); close().
-;;; - If FD/PORT is a port, this shifts the port's underlying file descriptor
-;;;   to TARGET, as above, closing the old one. Port's revealed count is
-;;;   set to 1.
-;;; TARGET is evicted before the shift -- if there is a port allocated to
-;;; file descriptor TARGET, it will be shifted to another file descriptor.
-
-; (define (move->fdes fd/port target)
-;   (let ((doit (lambda (fd)
-; 		(if (not (= fd target))
-; 		    (begin (evict-ports target) ; Evicts any ports at TARGET.
-; 			   (%dup2 fd target))))))
-
-;     (cond ((integer? fd/port)
-; 	   (doit fd/port)
-; 	   target)
-
-; 	  ((fdport? fd/port)
-; 	   (sleazy-call/fdes fd/port doit)
-; 	   (if (%move-fdport target fd/port 1)
-; 	       (error "fdport shift failed."))
-; 	   fd/port)
-
-; 	  (else (error "Argument not fdport or file descriptor" fd/port)))))
-
-(define (move->fdes port target) ; TODO - revise, increments revelated count??
-  (%dup2 (port->fdes port) target))
-
-(define (input-source? fd/port)
-  (check-arg fd/port? fd/port input-source?) ; TODO - I am not sure this is correct?
-  (input-port? fd/port))
-
-(define (output-source? fd/port)
-  (check-arg fd/port? fd/port output-source?)
-  (output-port? fd/port))
+;; Moves an i/o handle FD/PORT to fd TARGET.
+; - If FD/PORT is a file descriptor, this is dup2(); close().
+; - If FD/PORT is a port, this shifts the port's underlying file descriptor
+;   to TARGET, as above, closing the old one. Port's revealed count is
+;   set to 1.
+; TARGET is evicted before the shift -- if there is a port allocated to
+; file descriptor TARGET, it will be shifted to another file descriptor.
+(define (move->fdes fd/port target)
+  (check-arg fd/port? fd/port dup->fdes)
+  (cond ((and (integer? fd/port) (not (= fd/port target)))
+          (evict-ports target)
+          (%dup2 fd/port target)
+          (close-fdes fd/port))
+        ((fdport? fd/port)
+          (move-fdport! fd/port target)))) ; Takes care of fd==target case
 
 ;;; If FD/PORT is a file descriptor, returns a file descriptor.
 ;;; If FD/PORT is a port, returns a port.
 (define (dup fd/port . maybe-target)
   (check-arg fd/port? fd/port dup)
-  (apply (cond ((integer? fd/port) dup->fdes)
-	       ((input-port?  fd/port) dup->inport)
-	       ((output-port? fd/port) dup->outport))
+  (apply (cond 
+          ((integer?     fd/port) dup->fdes)
+	        ((input-port?  fd/port) dup->inport)
+	        ((output-port? fd/port) dup->outport))
 	 fd/port maybe-target))
 
 (define (dup->fdes fd/port . maybe-target)
   (check-arg fd/port? fd/port dup->fdes)
   (if (pair? maybe-target)
       (let ((target (car maybe-target)))
-	(close-fdes target)	; Thus evicting any port there.
-	(sleazy-call/fdes fd/port (lambda (fd) (%dup2 fd target))))
+	      (evict-ports target)	; Evict port open on target
+        ; If target is fd, it will be closed silently by dup2
+	      (sleazy-call/fdes fd/port (lambda (fd) (%dup2 fd target))))
       (sleazy-call/fdes fd/port %dup)))
 
 (define (dup->inport fd/port . maybe-target)
@@ -199,10 +186,11 @@
 
 (define (really-dup->port port-maker fd/port . maybe-target)
   (let ((fd (apply dup->fdes fd/port maybe-target))
+        (revealed-count (if (null? maybe-target) 0 1))
         (os-path (if (fdport? fd/port) 
                      (fdport->os-path fd/port) 
                      "<dup'd from fd>")))
-    (port-maker fd (if (null? maybe-target) 0 1) os-path)))
+    (port-maker fd revealed-count os-path)))
 
 ;;; Not exported.
 (define (shell-open path flags fdes)
@@ -234,19 +222,36 @@
          ((input-port?  port/fd) close-input-port)
          (else (error "Not file-descriptor or port" port/fd)))  port/fd))
 
+; Not Exported ;
+;; Moves the given fdport from it's current fd 
+; If target not specified, moves with dup; otherwise, dup2
+; Takes care of all the internal bookkeeping, accounts for fd==target case
+(define (move-fdport! fdport . maybe-target)
+  (call-with-current-continuation
+    (lambda (ret)
+      ; s48's dup mutates fdport's channel and returns a new port opened on the old fd
+      ; This allows us to keep the original fdport + plays nice with the VM
+      (let* ((old-fd (fdport->fd fdport))
+             (target (if (pair? maybe-target) (car maybe-target) #f))
+             (revealed-count (if target 0 1))
+             ; Because of s48's bug(?) we can run dup directly on channels instead of s48 ports
+             (raw-channel (fdport->channel fdport)))
+        (if (eq? old-fd target) (ret))
+        (if target
+            ; We immediately close the  new s48 port returned by s48's dups
+            (close (s48-dup2 raw-channel target))  
+            (close (s48-dup raw-channel)))
+        (delete-fdport! old-fd)
+        (set-fdport! (fdport->fd fdport) fdport revealed-count)))))  
+
 ;; If this fd has an associated input or output port,
 ;; move it to a new fd, freeing this one up.
 (define (evict-ports fd)
-  (cond ((maybe-ref-fdport-port fd) =>       ; Shouldn't bump the revealed count.
-         (lambda (port)
-             (%move-fdport (fdport->fd (s48-dup port)) port 0)  ;s48's dup modifies port's channel for us
-             #t))
+  (cond ((maybe-ref-fdport-port fd) =>    ; Does not bump the revealed count.
+         (lambda (fdport)                 ; Even if the revealed count!=0, we shift it silently 
+          (move-fdport! fdport)
+          #t))
         (else #f)))
-
-(define (%move-fdport old-fd port new-revealed)
-  (delete-fdport! old-fd)
-  (set-fdport! (fdport->fd port) port new-revealed)
-  #f)  ; JMG: It used to return #f on succes in 0.5.1, so we do the same
 
 (define (close-fdes fd)
   (if (evict-ports fd)

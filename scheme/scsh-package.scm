@@ -294,7 +294,7 @@
         (modify channel-ports (rename (port->channel s48-port->channel)) (expose port->channel))
         ports
         (subset threads-internal (thread-continuation))
-        (modify posix-i/o (rename (port->fd s48-port->fd) (dup s48-dup) (dup2 s48-dup2)) ; TODO: revisit, make sure there are no internal channel-cell inconsistensies
+        (modify posix-i/o (rename (port->fd s48-port->fd) (dup s48-dup) (dup2 s48-dup2)) 
           (expose port->fd
                   dup
                   dup2)) 

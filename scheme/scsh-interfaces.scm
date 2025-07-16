@@ -61,7 +61,6 @@
 	  fdes->outport
 	  evict-ports
 	  fdport?
-	  %move-fdport
 	  close-fdes
 	  make-input-fdport/fd
 	  make-output-fdport/fd
