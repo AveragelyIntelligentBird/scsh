@@ -60,6 +60,11 @@
   (delete-fdport! (channel-os-index channel))
   (close-channel channel))
 
+;;; Finalizer for fdports (runs before being GC'd)
+(define (finalize-fdport port)
+  (force-output-if-open port) ; Does nothing on input ports
+  (close-fdport-channel (fdport->channel port)))
+
 ;;; Portmakers
 ;;; ----------------------------------
 
@@ -88,7 +93,7 @@
           make-input-fdport channel bufpol))
       ; Valid ports
       (else  ; TODO: do we want to warn about too small buf for block?
-       (really-make-input-fdport channel bufpol buffer-size close-fdport-channel)))))      
+       (really-make-input-fdport channel bufpol buffer-size close-fdport-channel finalize-fdport)))))      
           
 (define (make-output-fdport channel bufpol . maybe-buffer-size)
   (let* ((buffer-size (if (null? maybe-buffer-size) 
@@ -107,7 +112,7 @@
             make-output-fdport channel buffer-size))
       ; Valid ports
       (else ; TODO: do we want to warn about too small buf for block?
-        (really-make-output-fdport channel bufpol buffer-size close-fdport-channel)))))
+        (really-make-output-fdport channel bufpol buffer-size close-fdport-channel finalize-fdport)))))
 
 ;;; Makers for fdports given an fd
 (define (make-input-fdport/fd fd revealed os-path)

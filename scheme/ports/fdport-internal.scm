@@ -284,7 +284,7 @@
 
 ; Assuming all arguments are valid 
 (define unbuf-port-buf-size 64) ; Arbitrary small vlaue for unbuffered buffers
-(define (really-make-input-fdport channel bufpol buffer-size closer)
+(define (really-make-input-fdport channel bufpol buffer-size closer finalizer)
 	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
 						unbuf-port-buf-size
 						buffer-size))
@@ -295,6 +295,7 @@
 				(make-byte-vector (channel-buffer-size)  0)
 				0
 				0)))
+	(add-finalizer! port finalizer)         ; runs right before GC
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug where new ports are latin-1
 	port))
@@ -565,7 +566,7 @@
 			(port-handler-ready? buf-handler)
 			(port-handler-force buf-handler))))
 
-(define (really-make-output-fdport channel bufpol buffer-size closer)
+(define (really-make-output-fdport channel bufpol buffer-size closer finalizer)
 	(let* ((bufsize (if (buf-policy=? bufpol bufpol/none)
 						unbuf-port-buf-size ; not really important because unbuf will mostly bypass buffer, leave for consistency
 						buffer-size))
@@ -577,7 +578,7 @@
 				0
 				(channel-buffer-size)))) ; port limit that we don't actually care about
 	(register-flushable-port! port)
-	(add-finalizer! port force-output-if-open) ; s48 forces output if it gc's a an open output port; do we want this?
+	(add-finalizer! port finalizer)      ; runs right before GC
 	(set-port-crlf?! port (channel-crlf?))
 	(set-port-text-codec! port utf-8-codec) ; Accounts for s48 bug where new ports are latin-1
 	port))
