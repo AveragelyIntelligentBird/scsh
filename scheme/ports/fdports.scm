@@ -92,7 +92,7 @@
           "line buffering is invalid on input ports"
           make-input-fdport channel bufpol))
       ; Valid ports
-      (else  ; TODO: do we want to warn about too small buf for block?
+      (else 
        (really-make-input-fdport channel bufpol buffer-size close-fdport-channel finalize-fdport)))))      
           
 (define (make-output-fdport channel bufpol . maybe-buffer-size)
@@ -111,7 +111,7 @@
             "invalid channel"
             make-output-fdport channel buffer-size))
       ; Valid ports
-      (else ; TODO: do we want to warn about too small buf for block?
+      (else
         (really-make-output-fdport channel bufpol buffer-size close-fdport-channel finalize-fdport)))))
 
 ;;; Makers for fdports given an fd
@@ -174,9 +174,6 @@
    (let* ((count (fdport:revealed port))
           (newcount (+ count delta)))
      (set-fdport:revealed! port newcount))))
-
-(define (fdport-channel-ready? fdport) ; TODO - do we need this?
-  (channel-ready? (fdport->channel fdport)))
 
 ;;; Fdport flush control
 ;;; ---------------------

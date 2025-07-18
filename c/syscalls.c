@@ -487,19 +487,83 @@ s48_ref_t scsh_lseek(s48_call_t call, s48_ref_t sch_fdes,
   return s48_enter_long_2(call, retval);
 }
 
-s48_ref_t scsh_open(s48_call_t call, s48_ref_t sch_path,
-                    s48_ref_t sch_flags, s48_ref_t sch_mode)
+// TODO, WIP
+// Make it smarter once i implement my own file-flags
+
+int
+scsh_extract_file_options(s48_call_t call, s48_ref_t sch_file_options)
 {
-  int retval;
+  int	c_file_options;
+  long	file_options;
 
-  RETRY_OR_RAISE_NEG(retval,
-                     open(s48_extract_byte_vector_2(call, sch_path),
-                          s48_extract_long_2(call, sch_flags),
-                          s48_extract_long_2(call, sch_mode)),
-                     "scsh_open");
+  file_options = s48_enum_set2integer_2(call, sch_file_options);
 
-  return s48_enter_long_2(call, retval);
+  c_file_options =
+    (00001 & file_options ? O_CREAT    : 0) |
+    (00002 & file_options ? O_EXCL     : 0) |
+    (00004 & file_options ? O_NOCTTY   : 0) |
+    (00010 & file_options ? O_TRUNC    : 0) |
+    (00020 & file_options ? O_APPEND   : 0) |
+    /* POSIX 2nd ed., not in Linux
+    (00040 & file_options ? O_DSYNC    : 0) |
+    */
+    (00100 & file_options ? O_NONBLOCK : 0) |
+    /* POSIX 2nd ed., not in Linux
+    (00200 & file_options ? O_RSYNC    : 0) |
+    */
+    /* Not in FreeBSD
+    (00400 & file_options ? O_SYNC     : 0) |
+    */
+    (01000 & file_options ? O_RDONLY   : 0) |
+    (02000 & file_options ? O_RDWR     : 0) |
+    (04000 & file_options ? O_WRONLY   : 0);
+
+  return c_file_options;
 }
+
+mode_t
+scsh_extract_mode(s48_call_t call, s48_ref_t sch_mode)
+{
+  long mode = s48_extract_long_2(call, 
+    s48_unsafe_record_ref_2(call, sch_mode, 0));
+
+  mode_t c_mode =
+    (004000 & mode ? S_ISUID : 0) |
+    (002000 & mode ? S_ISGID : 0) |
+    (001000 & mode ? S_ISVTX : 0) |
+    (00400  & mode ? S_IRUSR : 0) |
+    (00200  & mode ? S_IWUSR : 0) |
+    (00100  & mode ? S_IXUSR : 0) |
+    (00040  & mode ? S_IRGRP : 0) |
+    (00020  & mode ? S_IWGRP : 0) |
+    (00010  & mode ? S_IXGRP : 0) |
+    (00004  & mode ? S_IROTH : 0) |
+    (00002  & mode ? S_IWOTH : 0) |
+    (00001  & mode ? S_IXOTH : 0);
+
+  return c_mode;
+}
+
+
+s48_ref_t scsh_open(s48_call_t call, s48_ref_t path,
+                    s48_ref_t options, s48_ref_t mode)
+{
+  int		fd;
+
+  char* c_path  = s48_extract_byte_vector_readonly_2(call, path);
+  int c_options = scsh_extract_file_options(call, options);
+  mode_t c_mode = scsh_extract_mode(call, mode);
+  
+  // Output ports non-blocking by default
+  if ((O_WRONLY & c_options) || (O_RDWR & c_options))
+    c_options |= O_NONBLOCK;
+
+  RETRY_OR_RAISE_NEG(fd, open(c_path, c_options, c_mode), "posix_open");
+
+  return s48_enter_long_2(call, fd);
+}
+
+///////////////////////////
 
 s48_ref_t char_ready_fdes(s48_call_t call, s48_ref_t sch_fd)
 {

@@ -301,8 +301,11 @@
         (modify posix-files (rename (open-file s48-open-file))
                 (expose open-file
                         file-options
+                        file-options-on?
                         file-options-union
-                        file-mode))
+                        file-mode
+                        file-mode?
+                        integer->file-mode))
         (subset architecture (channel-status-option))
         (subset interrupts (enable-interrupts!
                             disable-interrupts!

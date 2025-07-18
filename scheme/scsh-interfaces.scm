@@ -67,6 +67,9 @@
 	  close
 	  seek/set
 	  open-file
+
+    open-fdes
+
 	  pipe
 	  with-current-output-port*
 	  with-current-error-port
@@ -236,6 +239,9 @@
 
 (define-interface scsh-file-interface
   (export open-file
+
+          open-fdes
+          
           file-options
           create-directory
           create-fifo

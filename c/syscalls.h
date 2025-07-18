@@ -37,7 +37,7 @@ s48_ref_t scsh_dup2(s48_call_t call, s48_ref_t sch_oldd,  s48_ref_t sch_newd);
 s48_ref_t scsh_lseek(s48_call_t call, s48_ref_t sch_fdes, s48_ref_t sch_offset,
 		     s48_ref_t sch_whence);
 
-s48_ref_t scsh_open(s48_call_t call, s48_ref_t sch_path, s48_ref_t sch_flags, s48_ref_t sch_mode);
+s48_ref_t scsh_open(s48_call_t call, s48_ref_t path, s48_ref_t options, s48_ref_t mode);
 
 s48_ref_t scm_utime(s48_call_t call, s48_ref_t path, s48_ref_t ac, s48_ref_t mod);
 

@@ -42,19 +42,21 @@
 ;;; File open and close -> fdport
 ;;; ----------------------------------
 
-; TODO implement our own open-file to avoid registering output port as "periodically flushed" at all smh
+(define (open-fdes fname options . maybe-mode)
+  (let* ((mode (:optional maybe-mode (file-mode read write))) ; #o666 
+         (mode-arg (cond ((file-mode? mode) mode)
+                         ((integer? mode) (integer->file-mode mode))
+                         (else (error "Invalid file mode (not number or file-mode)" mode)))))
+    (with-resources-aligned
+              (list cwd-resource umask-resource euid-resource egid-resource)
+              (lambda () (%open fname options mode-arg)))))
+
 (define (open-file fname options . maybe-mode)
-  (let* ((s48-port
-          (with-resources-aligned
-            (list cwd-resource umask-resource euid-resource egid-resource)
-            (lambda ()
-              (s48-open-file fname options (:optional maybe-mode (file-mode read write))))))
-         (channel (s48-port->channel s48-port))
-         (port (if (input-port? s48-port)
-                    (make-input-fdport channel bufpol/block)
-                    (make-output-fdport channel bufpol/block))))
-    (set-fdport! (fdport->fd port) port 0)
-    port))
+  (let ((fd (apply open-fdes fname options maybe-mode))
+        (input? (file-options-on? options (file-options read-only))))
+    (if input?
+      (make-input-fdport/fd  fd 0 fname)
+      (make-output-fdport/fd fd 0 fname))))
 
 (define (open-input-file fname . maybe-options)
   (let ((options (:optional maybe-options (file-options))))
@@ -140,7 +142,7 @@
 ; -- just sneakily grab the fdes and run.
 (define (sleazy-call/fdes fd/port proc)
   (proc (cond ((integer? fd/port) fd/port)
-              ((fdport? fd/port) (fdport->fd fd/port))
+              ((fdport? fd/port)  (fdport->fd fd/port))
               (else (error "Not a file descriptor or fdport." fd/port)))))
 
 ;; Moves an i/o handle FD/PORT to fd TARGET.
@@ -266,33 +268,6 @@
 (define (flush-fdport fdport)
   (force-output (check-arg fdport? fdport flush-fdport)))
 
-;;; with-current-foo-port procs
-;;; ---------------------------
-
-(define (with-current-input-port* port thunk)
-  (call-with-current-input-port port thunk))
-
-(define (with-current-output-port* port thunk)
-  (call-with-current-output-port port thunk))
-
-(define (with-current-error-port* port thunk)
-  (call-with-current-noise-port port thunk))
-
-(define (with-error-output-port* port thunk)
-  (call-with-current-noise-port port thunk))
-
-(define-simple-syntax (with-current-input-port port body ...)
-  (with-current-input-port* port (lambda () body ...)))
-
-(define-simple-syntax (with-current-output-port port body ...)
-  (with-current-output-port* port (lambda () body ...)))
-
-(define-simple-syntax (with-current-error-port port body ...)
-  (with-current-error-port* port (lambda () body ...)))
-
-(define-simple-syntax (with-error-output-port port body ...)
-  (with-error-output-port* port (lambda () body ...)))
-
 ;;; I/O
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -333,9 +308,7 @@
 
 (define (pipe)
   (apply (lambda (r-fd w-fd)
-           (let ((r (fdes->inport  r-fd))
-                 (w (fdes->outport w-fd)))
-             (release-port-handle r)
-             (release-port-handle w)
+           (let ((r (make-input-fdport/fd  r-fd 0 "<read end of pipe>"))
+                 (w (make-output-fdport/fd w-fd 0 "<write end of pipe>")))
              (values r w)))
          (pipe-fdes)))

@@ -22,12 +22,15 @@
 
 ;; The MODE argument says whether we're doing a READ (#f) , a PEEK (#t),
 ;; or a CHAR-READY? ( '() ), as expected in the handler (see fdport-internal.scm)
-(define (make-read-or-peek-char mode)
-    (lambda (port)
-        ((port-handler-char (port-handler port)) port mode)))
-(define (real-read-char port)   (make-read-or-peek-char #t))
-(define (real-char-ready? port) (make-read-or-peek-char '()))
-(define (real-peek-char port)   (make-read-or-peek-char #f))
+
+(define (real-read-char port)   
+  ((port-handler-char (port-handler port)) port #f))
+
+(define (real-peek-char port)  
+  ((port-handler-char (port-handler port)) port #t))
+
+(define (real-char-ready? port)
+  ((port-handler-char (port-handler port)) port '()))
 
 (define-r5rs-input (read-char) input #f real-read-char
   (let ((port (fdes->inport input)))
