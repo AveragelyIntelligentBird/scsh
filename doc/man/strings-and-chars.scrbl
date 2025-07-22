@@ -4,13 +4,20 @@
 
 @local-table-of-contents[]
 
-@section{Manipulating file names}
-@subsection[#:tag "manipulaiting-file-names-terminology"]{Terminology}
-@subsection[#:tag "manipulaiting-file-names-procedures"]{Procedures}
-@section{Other string manipulation facilities}
-@section{Text encodings}
+@section[#:tag "byte-vectors-sec"]{Bytes and Byte vectors}
+Bytes are small integers between 0 and 255.
+<talk about bytes of course sigh>
+
+@section[#:tag "text-codecs-sec"]{Text encodings}
+port-text-codec set-port-text-codec!
 @subsection{Unicode: UTF-8, UTF-16, UTF-32}
 @subsection{ASCII}
 @subsection{Latin-1}
+
+@section{Manipulating file names}
+@subsection[#:tag "manipulaiting-file-names-terminology"]{Terminology}
+@subsection[#:tag "manipulaiting-file-names-procedures"]{Procedures}
+
+@section{Other string manipulation facilities}
 @section{Character predicates}
 @section{Deprecated character-set procedures}

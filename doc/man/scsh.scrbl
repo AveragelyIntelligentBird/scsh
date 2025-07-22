@@ -6,7 +6,7 @@
 
 @declare-exporting[scsh]
 
-@section{About Type Annotations}
+About Type Annotations
 
 The procedures in this documentation use type annotations (like @racket[string] 
 and @racket[number]) to indicate the expected kinds of values. These are for 

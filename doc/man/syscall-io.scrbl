@@ -1,118 +1,196 @@
-#lang scribble/doc
-@(require scribble/manual "def-with-nolink.rkt")
+#lang scribble/manual
 
-@title{I/O}
+@title{Input and Output}
+@margin-note{
+  In previous scsh releases, most I/O procedures used to accept integer file descriptors as valid 
+  read/write destinations. This feature has been deprecated due to limited use, multi-byte encoding
+  complications and conflicts with optimistic concurrency guarantees of Scheme 48's I/O system. 
+  Consider @seclink["port-map-sec"]{constructing a port on the file descriptor} instead.
+  }
+Scsh utilizes extended Scheme 48 ports as input and output devices for all its I/O procedures. 
+This means that every port is associated with:
+@itemlist[
+  @item{Separate handlers for reading/writing @emph{bytes, chars} and @emph{blocks of bytes}. In a 
+        multi-byte character encoding world, the distinction is important.}
+  @item{@seclink["text-codecs-sec"]{Text codec}, allowing seamless character encoding and decoding 
+        when using character i/o.}
+  @item{@seclink["buffering-sec"]{Buffering policy}, which can be configured before any i/o has taken 
+        place.}
+  @item{An internal buffer, which is used for buffered i/o and character endocing/decoding. Unbuffered 
+        port operatoins bypass the the port when possible.}
+  @item{If the port is opened on a file, it is also associated with a 
+        @seclink["port-revealed-sec"]{file descriptor}. Note that scsh uses an alternative 
+        implementation for OS channel ports, so Scheme 48 functions cannot be used on scsh @code{fdports}.}
+  ]
 
-<current approach is fully modular with regards to s48, it is not optimized for speed>
+@section{RnRS I/O Procedures and Extentions}
 
-@section{Standard RnRS I/O Procedures}
-In scsh, most standard RnRS I/O operations (such as @code{display} or @code{read-char}) work on both
-integer file descriptors and Scheme ports. When doing I/O with a file descriptor, the I/O operation
-is done directly on the file, bypassing any buffered data that may have accumulated in an associated
-port. Note that character-at-a-time operations such as @code{read-char} are likely to be quite slow
-when performed directly upon file descriptors.
+All the standard RnRS I/O procedures are defined in terms of character-oriented I/O. As a result, 
+the operations will necessarily be buffered (at least on per-character basis). This includes
+@as-index[@code{read}], @as-index[@code{read-char}], @as-index[@code{peek-char}], 
+@as-index[@code{char-ready?}], @as-index[@code{write}], @as-index[@code{write}], 
+@as-index[@code{write-char}], @as-index[@code{display}], @as-index[@code{newline}] and 
+@as-index[@code{format}]. @as-index[@code{write-string}] is also provided for convenience.
 
-The standard RnRS procedures @code{read-char}, @code{char-ready?}, @code{write}, @code{display},
-@code{newline}, and @code{write-char} are all generic, accepting integer file descriptor arguments
-as well as ports. Scsh also mandates the availability of @code{format}, and further requires
-@code{format} to accept file descriptor arguments as well as ports.
+In a systems programming setting, however, byte-oriented i/o is likely desired. For this pupose, 
+scsh offers the following variants of standard I/O procedures. See also @secref["byte-vectors-sec"].
 
-The procedures @code{peek-char} and @code{read} do @emph{not} accept file descriptor arguments,
-since these functions require the ability to read ahead in the input stream, a feature not supported
-by Unix I/O.
+@deftogether[(@defproc[(read-byte   [port fdport? (current-input-port)]) byte]
+              @defproc[(peek-byte   [port fdport? (current-input-port)]) byte]
+              @defproc[(byte-ready? [port fdport? (current-input-port)]) boolean]
+              @defproc[(write-byte  [byte byte?] [port fdport? (current-output-port)]) unspecific])]{
+These procedures allow for single-byte I/O on a given @var{port}, which defaults to standard i/o streams.
+@var{read-byte} reads a single byte and @var{write-byte} writes a single byte. @var{byte-ready?} 
+tells if a byte is available to be read.
 
-@section{Port Manipulation and Standard Ports}
-@defproc/nolink[(close-after [port port?] [consumer (-> port? any)]) any]{
-Returns @code{(consumer port)}, but closes the port on return. No dynamic-wind magic.
+@var{peek-byte} returns the next byte in the local buffer without moving the cursor. Note that this
+does not work on unbuffered ports, since Unix syscalls cannot peek head.}
+
+@deftogether[(@defproc[(read-block [buffer byte-vector?] [start integer?] [count integer?] 
+                        [port fdport? (current-input-port)]
+                        [wait? boolean? #t]) integer]
+              @defproc[(write-block [buffer byte-vector?] [start integer?] [count integer?] 
+                        [port fdport? (current-output-port)]) unspecific])]{
+@margin-note{
+  @code{read-block} approximates the behavior of @code{read-string/partial} (defined in previous 
+  scsh releases) adapted for multi-byte encoded strings. @code{write-string/partial} does not 
+  apply to this release at all since all output i/o is non-blocking by default.
+  }
+These procedures allow for byte-oriented block I/O on a given @var{port}, which defaults to standard 
+i/o streams. @var{read-block} reads a block of bytes from @var{port} into the given @var{buffer}, 
+directed by @var{start} index and @var{count} of bytes desired. If @var{wait?} is true, the thread
+will wait for input, otherwise, the procedure reaturns immediately. The returned integer is the number
+of bytes read. 
+
+@var{write-block} writes a block of bytes from @var{buffer} to @var{port}, directed by @var{start} 
+index and @var{count} of bytes desired. The write will always complete.}
+
+@section{Standard I/O Ports}
+
+In addition to the standard @as-index[@code{current-input-port}] and
+@as-index[@code{current-output-port}], scsh also defines a binding for a port currently used 
+for error messages---the scsh equivalent of stderr.
+
+@defproc[(error-output-port) fdport]
+
+@margin-note{
+  This means that there is no need to synchronize Unix' standard I/O file descriptors and 
+  Scheme's current I/O ports. You can assume that at scsh top level the stdports are always bound 
+  to stdio.
+}
+The bindings for standard I/O ports are fluids, which are set at startup of the system. 
+The bindings cannot be mutated with @code{set!} as it was in earlier releases, so instead scsh 
+provides procedures for temporarily installing alternative ports to these bindings. 
+
+
+@deftogether[(@defproc[(with-current-input-port* [port fdport?] [thunk (-> any)]) any]
+              @defproc[(with-current-output-port* [port fdport?] [thunk (-> any)]) any]
+              @defproc[(with-error-output-port* [port fdport?] [thunk (-> any)]) any]
+              @defproc[(with-current-ports* [input fdport?] [output fdport?] [error fdport?] 
+                                            [thunk (-> any)]) any])]{
+  These procedures install @var{port} as the current input, current output, and error output port,
+  respectively, for the duration of a call to @var{thunk} and return @var{thunk}'s value(s).
+
+  @var{with-current-ports} is equivalent to calling the previous three procedures nested one within 
+  another.
 }
 
-@defproc/nolink[(error-output-port) port?]{
-This procedure is analogous to @code{current-output-port}, but produces a port used for error
-messages---the scsh equivalent of stderr.
+@deftogether[(@defform[(with-current-input-port port body ...+)]
+              @defform[(with-current-output-port port body ...+)]
+              @defform[(with-error-output-port port body ...+)]
+              @defform[(with-current-ports input output error body ...+)])]{
+  These special forms are simply syntactic sugar for the @code{with-current-input-port*} procedure and
+  friends.
 }
 
-@deftogether[(@defproc/nolink[(with-current-input-port* [port port?] [thunk (-> any)]) any]
-              @defproc/nolink[(with-current-output-port* [port port?] [thunk (-> any)]) any]
-              @defproc/nolink[(with-error-output-port* [port port?] [thunk (-> any)]) any])]{
-These procedures install @var{port} as the current input, current output, and error output port,
-respectively, for the duration of a call to @var{thunk} and return @var{thunk}'s value(s).
+@defproc[(stdports->stdio) unspecific]{
+  Legacy procedure kept for convenience, although a lot less useful now. Synchronises Unix' standard 
+  I/O file descriptors and Scheme's current I/O ports. Causes the standard I/O file descriptors 
+  (0, 1, and 2) take their values from the current I/O ports. It is exactly equivalent to the 
+  series of redirections:
+
+  @codeblock{(dup (current-input-port)  0)
+            (dup (current-output-port) 1)
+            (dup (error-output-port)   2)}
+
+  We use @code{dup} and not @code{move->fdes} because the current output port and error port might 
+  be the same port.
 }
 
-@deftogether[(@defform/nolink[(with-current-input-port port body ...+)]
-              @defform/nolink[(with-current-output-port port body ...+)]
-              @defform/nolink[(with-error-output-port port body ...+)])]{
-These special forms are simply syntactic sugar for the @code{with-current-input-port*} procedure and
-friends.
+@section[#:tag "buffering-sec"]{Buffered I/O}
+
+ports are internally buffered to facilitate character encoding/decoding, but if the port is 
+configured to be unbuf, the internal buffer is bypassed when possible (i.e. non-char stuff).
+
+Scheme 48 ports use buffered I/O: data is transferred to or from the OS in blocks. 
+Scsh provides control of this mechanism: the programmer may force saved-up output data to be 
+transferred to the OS when he chooses, and may also choose which I/O buffering policy to employ 
+for a given port (or turn buffering off completely).
+
+It can be useful to turn I/O buffering off in some cases, for example when an I/O stream is to be 
+shared by multiple subprocesses. For this reason, scsh allocates an unbuffered port for file 
+descriptor 0 at start-up time. Because shells frequently share stdin with subprocesses, if 
+the shell does buffered reads, it might ``steal'' input intended for a subprocess. For this reason, 
+all shells, including sh, csh, and scsh, read stdin unbuffered. Applications that can tolerate 
+buffered input on stdin can reset (current-input-port) to block buffering for higher performance.
+
+{Note To support peek-char a Scheme implementation has to maintain a buffer for all input ports. 
+In scsh, for ``unbuffered'' input ports the buffer size is one. As you cannot request less then one 
+character there is no unrequested reading so this can still be called ``unbuffered input''.}
+
+(set-port-buffering! port policy [size])     --->     undefined         (procedure) 
+
+@code{set-port-buffering} is given as a legacy synonym.
+
+This procedure allows the programmer to assign a particular I/O buffering policy to a port, 
+and to choose the size of the associated buffer. It may only be used on new ports, i.e., 
+before I/O is performed on the port. There are three buffering policies that may be chosen:
+
+        bufpol/block 	General block buffering (general default)
+        bufpol/line 	Line buffering (tty default)
+        bufpol/none 	Direct I/O -- no buffering4
+
+The line buffering policy flushes output whenever a newline is output; whenever the buffer is 
+full; or whenever an input is read from stdin. Line buffering is the default for ports open on 
+terminal devices.
+
+The size argument requests an I/O buffer of size bytes. For output ports, size must be non-negative, 
+for input ports size must be positve. If not given, a reasonable default is used. For output ports, 
+if given and zero, buffering is turned off (i.e., size = 0 for any policy is equivalent to policy
+ = bufpol/none). For input ports, setting the size to one corresponds to unbuffered input as defined 
+ above. If given, size must be zero respectively one for bufpol/none.
+
+
+@defproc[(force-output [fd/port (or/c integer? fdport?)]) undefined]{
+This procedure does nothing when applied to an integer file descriptor. It flushes buffered output
+when applied to a port, and raises a write-error exception on error. Returns no value.
 }
 
-@defproc/nolink[(close [fd/port (or/c integer? port?)]) boolean?]{
-Closes the port or file descriptor.
-
-If @var{fd/port} is a file descriptor, and it has a port allocated to it, the port is shifted to a
-new file descriptor created with @code{(dup fd/port)} before closing @code{fd/port}. The port then
-has its revealed count set to zero.  This reflects the design criteria that ports are not associated
-with file descriptors, but with the streams they denote.
-
-To close a file descriptor, and any associated port it might have, you must instead say one of
-(as appropriate):
-
-@codeblock{(close (fdes->inport  fd))
-           (close (fdes->outport fd))}
-
-The procedure returns true if it closed an open port. If the port was already closed, it returns
-false; this is not an error.
-}
-
-@defproc/nolink[(stdports->stdio) undefined]{
-Synchronises Unix' standard I/O file descriptors and Scheme's current I/O ports. Causes the standard
-I/O file descriptors (0, 1, and 2) take their values from the current I/O ports. It is exactly
-equivalent to the series of redirections:
-
-@codeblock{(dup (current-input-port)  0)
-           (dup (current-output-port) 1)
-           (dup (error-output-port)   2)}
-
-@margin-note{Why not @code{move->fdes}? Because the current output port and error port might be the
-same port.}
-}
-
-@deftogether[(@defproc/nolink[(with-stdio-ports* [thunk (-> any)]) any]
-              @defform/nolink[(with-stdio-ports body ...+)])]{
-@code{with-stdio-ports*} binds the standard ports @code{(current-input-port)},
-@code{(current-output-port)}, and @code{(error-output-port)} to be ports on file descriptors 0, 1,
-2, and then calls @var{thunk}. It is equivalent to:
-
-@codeblock{(with-current-input-port (fdes->inport 0)
-             (with-current-output-port (fdes->inport 1)
-               (with-error-output-port (fdes->outport 2)
-                 (thunk))))}
-
-The @code{with-stdio-ports} special form is merely syntactic sugar.
+@defproc[(flush-all-ports) undefined]{
+This procedure flushes all open output ports with buffered data.
 }
 
 @section{String ports}
-Scheme48 has string ports, which you can use. Scsh has not committed to the particular interface or
+Scheme 48 has string ports, which you can use. Scsh has not committed to the particular interface or
 names that scheme48 uses, so be warned that the interface described herein may be liable to change.
-@; ^ isn't there a SRFI for this? change wording or remove if so
 
-
-@defproc/nolink[(make-string-input-port [string string?]) port?]{
+@defproc[(make-string-input-port [string string?]) port?]{
 Returns a port that reads characters from the supplied string.
 }
 
-@deftogether[(@defproc/nolink[(make-string-output-port) port?]
-              @defproc/nolink[(string-output-port-output [port port?]) string?])]{
+@deftogether[(@defproc[(make-string-output-port) port?]
+              @defproc[(string-output-port-output [port port?]) string?])]{
 A string output port is a port that collects the characters given to it into a string. The
 accumulated string is retrieved by applying @code{string-output-port-output} to the port.
 }
 
-@defproc/nolink[(call-with-string-output-port [procedure (-> port? any)]) string?]{
+@defproc[(call-with-string-output-port [procedure (-> port? any)]) string?]{
 The @var{procedure} value is called on a port. When it returns, @code{call-with-string-output-port}
 returns a string containing the characters that were written to that port during the execution of
 @var{procedure}.
 }
 
-@section{Revealed Ports and File Descriptors}
+@section[#:tag "port-revealed-sec"]{Revealed Ports and File Descriptors}
 
 The material in this section and the following one is not critical for most applications. You may
 safely skim or completely skip this section on a first reading.
@@ -234,7 +312,7 @@ descriptors from ports, which he should almost never have to do. If a user start
 descriptors have been allocated to what ports, he has to take responsibility for managing this
 information.
 
-@section{Port-Mapping Machinery}
+@section[#:tag "port-map-sec"]{Port-Mapping Machinery}
 
 The procedures provided in this section are almost never needed. You may safely skim or completely
 skip this section on a first reading.
@@ -253,26 +331,26 @@ Here are the routines for manipulating ports in scsh. The important points to re
 
 These rules are what is necessary to ``make things work out'' with no surprises in the general case.
 
-@deftogether[(@defproc/nolink[(fdes->inport [fd integer?]) port?]
-              @defproc/nolink[(fdes->outport [fd integer?]) port?])]{
+@deftogether[(@defproc[(fdes->inport [fd integer?]) port?]
+              @defproc[(fdes->outport [fd integer?]) port?])]{
 These guys return an input or output port respecitvely, backed by @var{fd}. The returned port has
 its revealed count set to 1.
 }
 
 @; will need to export fdport? if we use it as a predicate here.
-@defproc/nolink[(port->fdes [port fdport?]) integer?]{
+@defproc[(port->fdes [port fdport?]) integer?]{
 Returns the file descriptor backing @var{port} and increments its revealed count by 1.
 }
 
-@defproc/nolink[(port-revealed [port fdport?]) (or/c integer? #f)]{
+@defproc[(port-revealed [port fdport?]) (or/c integer? #f)]{
 Return the port's revealed count if positive, otherwise #f.
 }
 
-@defproc/nolink[(release-port-handle [port fdport?]) undefined]{
+@defproc[(release-port-handle [port fdport?]) undefined]{
 Decrement @var{port}'s revealed count.
 }
 
-@defproc/nolink[(call/fdes [fd/port (or/c integer? fdport?)]
+@defproc[(call/fdes [fd/port (or/c integer? fdport?)]
                                       [consumer (-> integer? any)]) any]{
 Calls @var{consumer} on a file descriptor; takes care of revealed bookkeeping. If @var{fd/port} is a
 file descriptor, this is just @code{(consumer fd/port)}. If @var{fd/port} is a port, calls
@@ -283,7 +361,7 @@ When @code{call/fdes} is called with port argument, you are not allowed to throw
 with a stored continuation, as that would violate the revealed-count bookkeeping.
 }
 
-@defproc/nolink[(move->fdes [fd/port (or/c integer? fdport?)] [target-fd integer?])
+@defproc[(move->fdes [fd/port (or/c integer? fdport?)] [target-fd integer?])
          (or/c integer? fdport?)]{
 Maps fd -> fd and port ->port.
 
@@ -299,18 +377,35 @@ In all cases when @var{fd/port} is actually shifted, if there is a port already 
 @var{target-fd}, it is first relocated to some other file descriptor.
 }
 
+@defproc[(close [fd/port (or/c fdport? integer?)]) boolean]{
+  scsh provides a generic @code{close} procedure that works on any @code{fdport} as well as a raw
+  file descriptor. The procedure returns true if it closed an open port or file descriptor. If the 
+  port was already closed, it returns false; this is not an error.
+
+  If @var{fd/port} is a file descriptor, and it has a port allocated to it, the port is shifted to a
+  new file descriptor created with @code{(dup fd/port)} before closing @code{fd/port}. The port then
+  has its revealed count set to zero.  This reflects the design criteria that ports are not associated
+  with file descriptors, but with the streams they denote.
+
+  To close a file descriptor, and any associated port it might have, you must instead say one of
+  (as appropriate):
+  @codeblock{
+    (close (fdes->inport  fd))
+    (close (fdes->outport fd))}
+}
+
+@defproc[(close-after [port port?] [consumer (-> port? any)]) any]{
+  Returns @code{(consumer port)}, but closes the port on return. No dynamic-wind magic.
+}
+
 @section{Unix I/O}
-@deftogether[(@defproc*[#:link-target? #f
-                        ([(dup [fd/port (or/c integer? fdport?)]) fdport?]
+@deftogether[(@defproc*[([(dup [fd/port (or/c integer? fdport?)]) fdport?]
                          [(dup [fd/port (or/c integer? fdport?)] [newfd integer?]) fdport?])]
-              @defproc*[#:link-target? #f
-                        ([(dup->inport [fd/port (or/c integer? fdport?)]) fdport?]
+              @defproc*[([(dup->inport [fd/port (or/c integer? fdport?)]) fdport?]
                          [(dup->inport [fd/port (or/c integer? fdport?)] [newfd integer?]) fdport?])]
-              @defproc*[#:link-target? #f
-                        ([(dup->outport [fd/port (or/c integer? fdport?)]) fdport?]
+              @defproc*[([(dup->outport [fd/port (or/c integer? fdport?)]) fdport?]
                          [(dup->outport [fd/port (or/c integer? fdport?)] [newfd integer?]) fdport?])]
-              @defproc*[#:link-target? #f
-                        ([(dup->fdes [fd/port (or/c integer? fdport?)]) integer?]
+              @defproc*[([(dup->fdes [fd/port (or/c integer? fdport?)]) integer?]
                          [(dup->fdes [fd/port (or/c integer? fdport?)] [newfd integer?]) integer?])])]{
 These procedures provide the functionality of C's @code{dup()} and @code{dup2()}. The different
 routines return different types of values: @code{dup->inport}, @code{dup->outport}, and
@@ -337,24 +432,19 @@ use @code{(dup->outport p)} to produce an equivalent output port for the tty. Be
 file with the @code{open/read+write} flag for this.
 }
 
-@defproc*[#:link-target? #f
-          ([(seek [fd integer?] [offset integer?]) integer?]
-           [(seek [fd integer?] [offset integer?] [whence integer?]) integer?])]{
-Reposition the I/O cursor for a file descriptor. @var{whence} is one of @code{seek/set},
-@code{seek/delta}, or @code{seek/end}, and defaults to @code{seek/set}. If @code{seek/set}, then
-@var{offset} is an absolute index into the file; if @code{seek/delta}, then @var{offset} is a
-relative offset from the current I/O cursor; if @code{seek/end}, then @var{offset} is a relative
-offset from the end of file. Note that not all file descriptors are seekable; this is dependent on
-the OS implementation. The return value is the resulting position of the I/O cursor in the I/O
-stream.
-}
+@tabular[#:row-properties (list 'bottom-border 'top)
+         #:sep @hspace[3]
+            (list (list "Value"       "Behavior")
+                  (list @code{#f}      @nested{signal an error (default)})
+                  (list @code{'query}  @nested{prompt the user})
+                  (list @emph{other}   @nested{delete the old object (with @code{delete-file} or
+                                                @code{delete-directory} as appropriate) before 
+                                                creating the new object}))]
 
-@defproc/nolink[(tell [fd integer?]) integer?]{
-Returns the position of the I/O cursor in the the I/O stream. Not all file descriptors support
-cursor-reporting; this is dependent on the OS implementation.
-}
 
-@defproc/nolink[(open-file [fname string?] [options file-options?] [mode file-mode? (filemode read write)]) fdport?]{
+
+
+@defproc[(open-file [fname string?] [options file-options?] [mode file-mode? (filemode read write)]) fdport?]{
 @var{options} is a file-option? (ref). You must use exactly one of the options @code{read-only},
 @code{write-only}, or @code{read-write}. The returned port is an input port if the @var{options}
 permit it, otherwise an output port. scheme48/scsh do not have input/output ports, so it's one
@@ -362,28 +452,58 @@ or the other. You can hack simultaneous I/O on a file by opening it r/w, taking 
 port, and duping it to an output port with @code{dup->outport}.
 }
 
-@deftogether[(@defproc/nolink[(open-input-file [fname string?] [options file-options? (file-options)]) port?]
-              @defproc/nolink[(open-output-file [fname string?]
-                                                [options file-options? (file-options create truncate)]
-                                                [mode file-mode? (file-mode read write)]) port?])]{
+NON blocking output by default, select/poll on input
+
+if you want it to block, you gotta do it explicitly
+
+@deftogether[(@defproc[(open-input-file [fname string?] [options file-options? (file-options)]) port?]
+              @defproc[(open-output-file [fname string?]
+                                         [options file-options? (file-options create truncate)]
+                                         [mode file-mode? (file-mode read write)]) port?])]{
 These are equivalent to @code{open-file}, after first including @code{read-only} or
 @code{write-only} options, respectively, in the @var{options} argument. The default values for
 @var{options} make the procedures backwards-compatible with their unary RnRS definitions.
 }
 
-@defproc/nolink[(pipe) (values [rport fdport?] [wport fdport?])]{
+@defproc[(open-fdes [fname string?]
+                    [options file-options? (file-options create truncate)]
+                    [mode file-mode? (file-mode read write)]) port?]{
+  ADD!!
+}
+
+@deftogether[(@defproc[(close-on-exec?      [fd/port (or/c integer? fdport?)]) boolean]
+              @defproc[(set-close-on-exec?! [fd/port (or/c integer? fdport?)] 
+                                             [cloexec? boolean?]) undefined])]{
+  @code{fdes-flags} and @code{set-fdes-flags} are given as legacy synonyms.
+}
+
+
+@deftogether[(@defproc[(file-status-flags      [fd/port (or/c integer? fdport?)]) file-flags]
+              @defproc[(set-file-status-flags! [fd/port (or/c integer? fdport?)] 
+                                                [flags file-flags?]) undefined])]{
+  @code{fdes-status} and @code{set-fdes-status} are given as legacy synonyms.
+}
+
+@defproc[(seek [fd integer?] [offset integer?] [whence integer? seek/set]) integer?]{
+Reposition the I/O cursor for a file descriptor. @var{whence} is one of @code{seek/set},
+@code{seek/delta}, or @code{seek/end}, and defaults to @code{seek/set}. If @code{seek/set}, then
+@var{offset} is an absolute index into the file; if @code{seek/delta}, then @var{offset} is a
+relative offset from the current I/O cursor; if @code{seek/end}, then @var{offset} is a relative
+offset from the end of file. Note that not all file descriptors are seekable; this is dependent on
+the OS implementation. The return value is the resulting position of the I/O cursor in the I/O
+stream.
+
+<this is in bytes, not characters, so take caution with mutlibyte encodings>
+
+}
+
+@defproc[(tell [fd integer?]) integer?]{
+Returns the position of the I/O cursor in the the I/O stream. Not all file descriptors support
+cursor-reporting; this is dependent on the OS implementation.
+}
+
+@defproc[(pipe) (values [rport fdport?] [wport fdport?])]{
 Returns two ports @var{rport} and @var{wport}, the read and write endpoints respectively of a Unix
 pipe.
-}
-
-@section{Buffered I/O}
-
-@defproc/nolink[(force-output [fd/port (or/c integer? fdport?)]) undefined]{
-This procedure does nothing when applied to an integer file descriptor. It flushes buffered output
-when applied to a port, and raises a write-error exception on error. Returns no value.
-}
-
-@defproc/nolink[(flush-all-ports) undefined]{
-This procedure flushes all open output ports with buffered data.
 }
 

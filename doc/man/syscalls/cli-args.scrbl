@@ -1,10 +1,10 @@
 #lang scribble/doc
-@(require scribble/manual "../def-with-nolink.rkt")
+@(require scribble/manual)
 
 @title{Accessing command-line arguments}
 
 @deftogether[(@defproc[(command-line) (listof string?)]
-              @defthing[#:kind "global" command-line-arguments string?])]{
+              @defthing[#:kind "global" command-line-arguments (listof string?)])]{
 
 Calling @code{(command-line)} returns the complete argv string list, including the program. The list 
 of strings @code{command-line-arguments} contains the arguments passed to the scsh process on the 
