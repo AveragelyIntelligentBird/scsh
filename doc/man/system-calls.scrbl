@@ -9,7 +9,7 @@ is discussed separately in @secref["networking-chapter"].
 @local-table-of-contents[]
 
 @include-section["syscall-err.scrbl"]
-@include-section["syscall-io.scrbl"]
+@include-section["syscalls/io.scrbl"]
 @include-section["syscalls/filesystem.scrbl"]
 @include-section["syscall-proc.scrbl"]
 @include-section["syscall-proc-state.scrbl"]
