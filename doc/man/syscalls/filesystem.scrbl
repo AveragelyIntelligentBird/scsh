@@ -5,30 +5,28 @@ Besides the procedures in this section, which allow access to the computer's fil
 scsh also provides a set of procedures which manipulate file @emph{names}. These 
 string-processing procedures are documented in @secref["manipulating-filenames"].
 
-<TODO file-mode interface>
-
 @section{Manipulating Filesystem Objects}
 @deftogether[(@defproc[(create-directory  [fname string?] 
                                           [mode file-mode? (file-mode all)] 
-                                          [override? (or/c #f 'query any/c) #f]) undefined]
+                                          [override? (or #f 'query any) #f]) undefined]
               @defproc[(create-fifo [fname string?]  
                                     [mode file-mode? (file-mode all)] 
-                                    [override? (or/c #f 'query any/c) #f]) undefined]
+                                    [override? (or #f 'query any) #f]) undefined]
               @defproc[(create-hard-link  [oldname string?] 
                                           [newname string?] 
-                                          [override? (or/c #f 'query any/c) #f]) undefined]
+                                          [override? (or #f 'query any) #f]) undefined]
               @defproc[(create-symlink    [oldname string?] 
                                           [newname string?] 
-                                          [override? (or/c #f 'query any/c) #f]) undefined])]{
+                                          [override? (or #f 'query any) #f]) undefined])]{
 @margin-note{
       Currently, if you try to create a hard or symbolic link from a file to itself, 
       you will error out with @var{override?} false, and simply delete your file with 
       @var{override?} true.}
 These procedures create objects of various kinds in the file system. 
 
-File mode @var{mode} is a file protection mask, as described in @;@secref{}.
-The default is @code{(file-mode all)}, which allows reading, writing and executing by anyone
-(i.e. #o777), but it is masked by the current umask.
+File mode @var{mode} is a file protection mask, as described in @secref["file-modes-sec"].
+The default is @code{(file-mode all)} (i.e. #o777), which allows reading, writing and executing by 
+anyone, but it is masked by the current umask.
 
 @var{override?} controls the action if there is already an object in the file system with 
 the given file name:
@@ -67,24 +65,24 @@ Return the filename referenced by the symbolic link @var{fname}.
 
 @defproc[(rename-file   [old-fname string?] 
                         [new-fname string?] 
-                        [override? (or/c #f 'query any/c) #f]) undefined]{
+                        [override? (or #f 'query any) #f]) undefined]{
 @var{override?} follows the same logic as in @code{create-directory} and co above. If you choose to
 override an existing object, then @var{old-fname} and @var{new-fname} must type-match --- either 
 both directories, or both non-directories. This is required by the semantics of Unix @code{rename()}.
 }
 
-@deftogether[(@defproc[(set-file-mode  [fname/fd/port (or/c string? integer? fdport?)] 
+@deftogether[(@defproc[(set-file-mode  [fname/fd/port (or string? integer? fdport?)] 
                                        [mode file-mode?]) undefined]
-              @defproc[(set-file-owner [fname/fd/port (or/c string? integer? fdport?)] 
+              @defproc[(set-file-owner [fname/fd/port (or string? integer? fdport?)] 
                                        [uid integer?]) undefined]
-              @defproc[(set-file-group [fname/fd/port (or/c string? integer? fdport?)] 
+              @defproc[(set-file-group [fname/fd/port (or string? integer? fdport?)] 
                                        [gid integer?]) undefined])]{
-These procedures set the permission bits, owner id, and group id of a file, respectively. The file
-can be specified by giving the file name, or either an integer file descriptor or a port open on the
-file. Setting file user ownership usually requires root privileges.
+These procedures set the permission bits (see @secref["file-modes-sec"]), owner id, and group id of a 
+file, respectively. The file can be specified by giving the file name, or either an integer file 
+descriptor or a port open on the file. Setting file user ownership usually requires root privileges.
 }
 
-@; TODO check how we run current time???
+@; TODO link in time
 @defproc[(set-file-times [fname string?]
                          [access-time integer? (current-time)]
                          [mod-time integer? (current-time)]) undefined]{
@@ -94,19 +92,19 @@ they are both taken to be the current time. You must provide both times or neith
 completes successfully, the file's time of last status-change (@code{ctime}) is set to the current time.
 }
 
-@defproc[(sync-file [fd/port (or/c integer? fdport?)]) undefined]{
+@defproc[(sync-file [fd/port (or integer? fdport?)]) undefined]{
 Calling @code{sync-file} causes Unix to update the disk data structures for a given file. If
 @var{fd/port} is a port, any buffered data it may have is first flushed.
 }
 
-@defproc[(truncate-file [fname/fd/port (or/c string? integer? fdport?)] 
+@defproc[(truncate-file [fname/fd/port (or string? integer? fdport?)] 
                         [len integer?]) undefined]{
 Truncate the specified file to @var{len} bytes in length.
 }
 
 @section{Querying File Information}
-@defproc[(file-info     [fname/fd/port (or/c string? integer? fdport?)] 
-                        [chase? any/c #t]) file-info?]{
+@defproc[(file-info     [fname/fd/port (or string? integer? fdport?)] 
+                        [chase? boolean? #t]) file-info?]{
 Returns a record structure containing everything there is to know about a file @var{fname/fd/port}.
 
 If the @var{chase?} flag is true (the default), then the procedure chases symlinks and reports 
@@ -143,35 +141,35 @@ of the follwing symbols:
 
 All of the field accessors for the @code{file-info} record are exposed to the @code{scsh-user} 
 top-level package. However, it might be more convenient to use the following bindings built on 
-top of @code{file-info}:
+top of @code{(file-info)}:
 
 @; TODO repalce the names with dash notation
-@deftogether[(@defproc[(file:type   [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t])
-                       (or/c 'block-special 'char-special 'directory 'fifo 'regular 'socket 'symlink)]
-              @defproc[(file:device [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
-              @defproc[(file:inode  [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
-              @defproc[(file:mode   [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) file-mode?]
-              @defproc[(file:nlinks [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
-              @defproc[(file:owner  [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
-              @defproc[(file:group  [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
-              @defproc[(file:size   [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
+@deftogether[(@defproc[(file:type   [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t])
+                       (or 'block-special 'char-special 'directory 'fifo 'regular 'socket 'symlink)]
+              @defproc[(file:device [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
+              @defproc[(file:inode  [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
+              @defproc[(file:mode   [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) file-mode?]
+              @defproc[(file:nlinks [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
+              @defproc[(file:owner  [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
+              @defproc[(file:group  [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
+              @defproc[(file:size   [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
               @defproc[(file:last-access  
-                                    [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
+                                    [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
               @defproc[(file:last-mod  
-                                    [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?]
+                                    [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?]
               @defproc[(file:last-status-change  
-                                    [fname/fd/port (or/c string? integer? fdport?)] 
-                                    [chase? any/c #t]) integer?])]{
+                                    [fname/fd/port (or string? integer? fdport?)] 
+                                    [chase? boolean? #t]) integer?])]{
 These procuders are a composition of @code{file-info} and its accessors. They allow more convenient
 access to file based information, without handling an intermediary file-info object.
 
@@ -182,17 +180,17 @@ Example:
             (directory-files "/usr/tmp"))
 }}
 
-@deftogether[(@defproc[(file-directory?   [fname/fd/port (or/c string? integer? fdport?)] 
-                                          [chase? any/c #t]) boolean?]
-              @defproc[(file-fifo?        [fname/fd/port (or/c string? integer? fdport?)]
-                                          [chase? any/c #t]) boolean?]
-              @defproc[(file-regular?     [fname/fd/port (or/c string? integer? fdport?)] 
-                                          [chase? any/c #t]) boolean?]
-              @defproc[(file-socket?      [fname/fd/port (or/c string? integer? fdport?)] 
-                                          [chase? any/c #t]) boolean?]
-              @defproc[(file-special?     [fname/fd/port (or/c string? integer? fdport?)] 
-                                          [chase? any/c #t]) boolean?]
-              @defproc[(file-symlink?     [fname/fd/port (or/c string? integer? fdport?)]) 
+@deftogether[(@defproc[(file-directory?   [fname/fd/port (or string? integer? fdport?)] 
+                                          [chase? boolean? #t]) boolean?]
+              @defproc[(file-fifo?        [fname/fd/port (or string? integer? fdport?)]
+                                          [chase? boolean? #t]) boolean?]
+              @defproc[(file-regular?     [fname/fd/port (or string? integer? fdport?)] 
+                                          [chase? boolean? #t]) boolean?]
+              @defproc[(file-socket?      [fname/fd/port (or string? integer? fdport?)] 
+                                          [chase? boolean? #t]) boolean?]
+              @defproc[(file-special?     [fname/fd/port (or string? integer? fdport?)] 
+                                          [chase? boolean? #t]) boolean?]
+              @defproc[(file-symlink?     [fname/fd/port (or string? integer? fdport?)]) 
                                           boolean?])]{
 These procedures are file-type predicates that test the type of a given file. They are applied to
 the same arguments to which @code{file-info} is applied; the sole exception is @code{file-symlink?},
@@ -212,12 +210,12 @@ Example:
 These are variants of the file-type predicates which work directly on @code{file-info} records.
 }
 
-@deftogether[(@defproc[(file-not-readable?   [fname/fd/port (or/c string? integer? fdport?)])
-                       (or/c #f 'search-denied 'permission 'no-directory 'nonexistent)]
-              @defproc[(file-not-writable?   [fname/fd/port (or/c string? integer? fdport?)])
-                       (or/c #f 'search-denied 'permission 'no-directory 'nonexistent)]
-              @defproc[(file-not-executable? [fname/fd/port (or/c string? integer? fdport?)])
-                       (or/c #f 'search-denied 'permission 'no-directory 'nonexistent)])]{
+@deftogether[(@defproc[(file-not-readable?   [fname/fd/port (or string? integer? fdport?)])
+                       (or #f 'search-denied 'permission 'no-directory 'nonexistent)]
+              @defproc[(file-not-writable?   [fname/fd/port (or string? integer? fdport?)])
+                       (or #f 'search-denied 'permission 'no-directory 'nonexistent)]
+              @defproc[(file-not-executable? [fname/fd/port (or string? integer? fdport?)])
+                       (or #f 'search-denied 'permission 'no-directory 'nonexistent)])]{
 This set of procedures are a convenient means to work on the permission bits of a file. The meaning
 of their return values are as follows:
 
@@ -254,9 +252,9 @@ desired operation. These permission-checking functions are mostly intended for s
 loose guarantees are tolerated.
 }
 
-@deftogether[(@defproc[(file-readable?    [fname/fd/port (or/c string? integer? fdport?)]) boolean?]
-              @defproc[(file-writable?    [fname/fd/port (or/c string? integer? fdport?)]) boolean?]
-              @defproc[(file-executable?  [fname/fd/port (or/c string? integer? fdport?)]) boolean?])]{
+@deftogether[(@defproc[(file-readable?    [fname/fd/port (or string? integer? fdport?)]) boolean?]
+              @defproc[(file-writable?    [fname/fd/port (or string? integer? fdport?)]) boolean?]
+              @defproc[(file-executable?  [fname/fd/port (or string? integer? fdport?)]) boolean?])]{
 These procedures are the logical negation of the preceding @code{file-not-}* procedures. Refer to those
 for a discussion of their problems and limitations. These procedures will only ever return @code{#t}
 or @code{#f}, and not the symbols giving specific reasons.
@@ -272,8 +270,8 @@ There are variants of the file permission predicates which work directly on @cod
 records.
 }
 
-@deftogether[(@defproc[(file-not-exists?  [fname/fd/port (or/c string? integer? fdport?)]) (or/c boolean? 'search-denied)]
-              @defproc[(file-exists?      [fname/fd/port (or/c string? integer? fdport?)]) boolean?])]{
+@deftogether[(@defproc[(file-not-exists?  [fname/fd/port (or string? integer? fdport?)]) (or boolean? 'search-denied)]
+              @defproc[(file-exists?      [fname/fd/port (or string? integer? fdport?)]) boolean?])]{
 The meaning of the return values of @code{file-not-exists?} are as follows:
 
 @tabular[#:row-properties (list 'bottom-border 'top)
@@ -321,8 +319,8 @@ filenames with whitespace in their names will be split into separate entries.
 }
 
 @deftogether[(@defproc[(open-directory-stream   [dir string?]) directory-stream?]
-              @defproc[(directory-stream?       [maybe-directory-stream any/c]) boolean?]
-              @defproc[(read-directory-stream   [directory-stream directory-stream?]) (or/c string? #f)]
+              @defproc[(directory-stream?       [maybe-directory-stream any]) boolean?]
+              @defproc[(read-directory-stream   [directory-stream directory-stream?]) (or string? #f)]
               @defproc[(close-directory-stream  [directory-stream directory-stream?]) undefined])]{
 These functions implement a direct interface to the @code{opendir()} / @code{readdir()} /
 @code{closedir()} family of functions for processing directory streams.
@@ -444,9 +442,9 @@ The actual default prefix used is controlled by the dynamic variable @code{*temp
 and can be overridden for increased security. See @code{temp-file-iterate} for details.
 }
 
-@deftogether[(@defproc[(temp-file-iterate [maker (-> string? (values any/c ...))]
+@deftogether[(@defproc[(temp-file-iterate [maker (-> string? (values any ...))]
                                           [template string? (fluid *temp-file-template*)]) 
-                                          (values any/c ...)]
+                                          (values any ...)]
               @defthing[#:kind "fluid" *temp-file-template* string?])]{
 @code{temp-file-iterate} can be used to perform certain atomic transactions on the file system
 involving filenames. Some examples:
@@ -474,9 +472,8 @@ After a number of unsuccessful trials, @code{temp-file-iterate} may give up and 
 
 Thus, if we ignore its optional @var{prefix} argument, @code{create-temp-file} could be defined as:
 
-@; TODO fix notaion for filemode
 @codeblock{(define (create-temp-file)
-             (let ((options (file-options create exclusive))
+             (let ((flags (file-flags create exclusive))
                    (mode (file-mode owner-read owner-write)))
                (temp-file-iterate
                  (lambda (f)

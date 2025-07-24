@@ -17,6 +17,8 @@ behind scsh can be found in a companion paper "A Scheme Shell" (reference).
 
 <talk about goals and limitations of the current release, e.g. being a self-contained s48 package > 
 
+<focused on Linux and freeBSD in this release, likely will generilze better in the future, pls let us know if we missed something>
+
 @section{Obtaining Scsh}
 The current version of scsh is still in development. We're using git as a source code management
 system, and the primary repository is hosted on github at
