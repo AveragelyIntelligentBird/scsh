@@ -1,5 +1,7 @@
-;;; Copyright (c) 1994 by Olin Shivers
-;;; Add scsh conditions to s48.
+;;; Scsh errno handling interface ---------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Implements errno-focused exception handling interface, using Scheme48 conditions
+;; Extends work done by Olin Shivers
 
 (define (with-errno-handler* handler thunk)
   (with-exception-handler
@@ -12,12 +14,23 @@
           (raise condition)))
     thunk))
 
-(define (errno-error errno who message . irritants)
-  (raise (condition
-          (make-os-error errno)
-          (make-who-condition who)
-          (make-message-condition message)
-          (make-irritants-condition irritants))))
+(define (raise-errno-error errno/num who . irritants)
+  (let ((errnum (cond ((errno? errno/num) (errno-os-number errno/num))
+                     ((integer? errno/num) errno/num)
+                     (else (error "Not an errno or integer" errno/num)))))
+    (raise 
+      (condition
+        (make-os-error errnum)
+        (make-who-condition who)
+        (make-message-condition
+          (os-string->string
+          (byte-vector->os-string
+            (os-error-message errnum))))
+        (make-irritants-condition irritants)))))
+
+; Legacy synonym
+(define (errno-error errno/num who . irritants)
+  (apply raise-errno-error errno/num who irritants))
 
 (define-syntax weh-cond
   (syntax-rules (else)

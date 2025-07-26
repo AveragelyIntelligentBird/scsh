@@ -19,10 +19,18 @@
 
 (define-interface scsh-errors-interface
   (export errno-error
-          (with-errno-handler* (proc ((proc (:number :value) :values); handler
-                                      (proc () :values))             ; thunk
-                                     :values))
-          (with-errno-handler :syntax)))
+        raise-errno-error
+        (with-errno-handler* (proc ((proc (:number :value) :values); handler
+                                    (proc () :values))             ; thunk
+                                    :values))
+        (with-errno-handler :syntax)
+        (errno :syntax)
+        errno-name
+        errno-os-number
+        integer->errno
+        name->errno
+              errno=?
+              errno?))
 
 (define-interface scsh-file-syscalls-interface
   (export %set-cloexec
@@ -71,7 +79,7 @@
     open-fdes
 
 	  pipe
-	  flush-all-ports
+    flush-all-ports
 	  close-after
 	  error-output-port
 	  close

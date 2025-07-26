@@ -1,103 +1,106 @@
-#lang scribble/doc
-@(require scribble/manual "def-with-nolink.rkt")
+#lang scribble/manual
 
 @title{Errors}
-@; this section is extremely out of date / touch. need to
-@; A: update to talk in terms of srfi exceptions
-@; B: Either link to, or (more likely) repatriate the s48 errno api.
-@; repatriating is favorable so that we're not just passing integers around and are using objects
-@; with a bit more info.
 
 Scsh syscalls never return error codes, and do not use a global @code{errno} variable to report
-errors. Errors are consistently reported by raising exceptions. This frees up the procedures to
+errors. Errors are always reported by raising exceptions. This frees up the procedures to
 return useful values, and allows the programmer to assume that
 @emph{if a syscall returns, it succeeded.} This greatly simplifies the flow of the code from the
 programmer's point of view.
 
-Since Scheme does not yet have a standard exception system, the scsh definition remains somewhat
-vague on the actual form of exceptions and exception handlers. When a standard exception system is
-defined, scsh will move to it. For now, scsh uses the scm exception system, with a simple sugaring
-on top to hide the details in the common case.
+Scsh implements an errno-focused exception handling interface on top of Scheme 48's 
+@seclink["s48-exceptions-sec"]{standard exception handling}. Both are exposed to scsh user, but the
+interface described in this section might be more pleaseant for scripting purposes.
 
-System call error exceptions contain the Unix @code{errno} code reported by the system call. Unlike
-C, the @code{errno} value is a part of the exception packet, it is @emph{not} accessed through a
-global variable.
+@margin-note{
+  In older scsh releases, errnos were literal integers, but that is deprecated now.
+  @code{raise-errno-error} is implicitly coercing integer to corresponding @code{errno}, but 
+  pattern matching @code{with-errno-handler} will not work. Please use the new notation.
+}
+To refer to specific Unix errors, scsh utilizes @code{errno} structure, as described 
+@seclink["errno-enum-sec"]{here}. Also, note that in scsh, system calls never return
+@code{(error intr)}---they automatically retry.
 
-For reference purposes, the Unix @code{errno} numbers are bound to the variables @code{errno/perm},
-@code{errno/noent}, etc. System calls never return \@code{error/intr}---they automatically retry.
+@defproc*[([(raise-errno-error [errno/num (or errno? integer?)] 
+                               [who symbol?]) unspecific]
+           [(raise-errno-error [errno/num (or errno? integer?)] 
+                               [who symbol?]
+                               [data (listof any)]) unspecific])]{
+  Raises a Unix error exception. @var{errno/num} is either an OS error number or an @code{errno} 
+  object. @var{who} specifies the offending procedure and optional @var{data} is a list containing any
+  additional information about the error. 
 
-@; update this function and this section to use legit errnos.
-@defproc/nolink[(errno-error [errno integer?] [syscall string?] [data any/c] ...) any]{
-Raises a Unix error exception for Unix error number @var{errno}. The @var{syscall} and @var{data}
-arguments are packaged up in the exception packet passed to the exception handler.
+  Exception packet is constructed with OS error number, a corresponding OS error message, offender
+  @var{who} and @var{data}. Internally, the "packet" is a compound condition.
+
+  @code{errno-error} is given as a legacy synonym.
 }
 
-@deftogether[(@defform/nolink[(with-errno-handler handler-spec ... body)]
-              @defproc/nolink[(with-errno-handler* [handler (-> integer? (listof any/c) (values any/c ...))]
-                                                              [thunk (-> (values any/c ...))])
-                       (values any/c ...)])]{
-Unix syscalls raise error exceptions by calling @code{errno-error}. Programs can use
-@code{with-errno-handler*} to establish handlers for these exceptions.
+Unix syscalls raise error exceptions by calling @code{raise-errno-error}. 
+Programs can use @code{with-errno-handler*} and @code{with-errno-handler} to establish handlers for 
+these exceptions.
 
-If a Unix error arises while @var{thunk} is executing, @var{handler} is called on two arguments
-like this:
+@defproc[(with-errno-handler* [handler (-> integer? (listof any) any)]
+                              [thunk (-> any)])
+                              (values value/s of thunk)]{
+  If a Unix error arises while @var{thunk} is executing, @var{handler} is called on two arguments
+  like this:
 
-@codeblock{(handler errno packet)}
+  @codeblock{(handler errno-os-number packet)}
 
-@var{packet} is a list of the form
+  where @var{packet} is a list of the form:
 
-@codeblock{(errno-msg syscall data ...)}
+  @codeblock{(errno-msg who . data)}
 
-where @var{errno-msg} is the standard Unix error message for the error, @var{syscall} is the
-procedure that generated the error, and @var{data} is a list of information generated by the error,
-which varies from syscall to syscall.
+  where @var{errno-msg} is the standard Unix error message for the error, @var{who} is the
+  procedure that generated the error, and @var{data} is a list of information generated by the error,
+  which varies from syscall to syscall.
 
-If @var{handler} returns, the handler search continues upwards. @var{handler} can acquire the
-exception by invoking a saved continuation. This procedure can be sugared over with the following
-syntax:
-
-@codeblock{(with-errno-handler
-                 ((errno packet) clause ...)
-             body ...+)}
-
-This form executes the body forms with a particular errno handler installed. When an errno error is
-raised, the handler search machinery will bind variable @var{errno} to the error's integer code, and
-variable @var{packet} to the error's auxiliary data packet. Then, the clauses will be checked for a
-match. The first clause that matches is executed, and its value is the value of the entire
-@code{with-errno-handler} form. If no clause matches, the handler search continues.
-
-Error clauses have two forms
-
-@codeblock{((errno ...) body ...)
-           (else body ...)}
-
-In the first type of clause, the @var{errno} forms are integer expressions. They are evaluated and
-compared to the error's errno value. An @code{else} clause matches any errno value. Note that the
-@var{errno} and @var{data} variables are lexically visible to the error clauses.
-
-Example:
-
-@codeblock{(with-errno-handler
-                ((errno packet) ; Only handle 3 particular errors.
-                 ((errno/wouldblock errno/again)
-                   (loop))
-                 ((errno/acces)
-                   (format #t "Not allowed access!")
-                   #f))
-
-             (foo frobbotz)
-             (blatz garglemumph))}
-
-It is not defined what dynamic context the handler executes in, so fluid variables cannot reliably
-be referenced.
-@; ^ check exception srfi to see if this is specified.
-
-Note that Scsh system calls always retry when interrupted, so that the @code{errno/intr} exception
-is never raised. If the programmer wishes to abort a system call on an interrupt, he should have the
-interrupt handler explicitly raise an exception or invoke a stored continuation to throw out of the
-system call.
+  If @var{handler} returns, the handler search continues upwards. @var{handler} can acquire the
+  exception by invoking a saved continuation.  
 }
 
+This procedure can be sugared over with the following syntax:
+             
+@defform[(with-errno-handler handler-spec body ...+)
+         #:grammar
+         [(handler-spec ((errno-os-number packet) clause ...))
+          (clause (code:line ((errno-name ...) clause-body ...))
+                  (else body ...))]]{
+
+  This form executes the body forms with a particular @code{errno} handler installed. When an errno 
+  error is raised, the handler search machinery will bind variable @var{errno-os-number} to the error's 
+  integer code, and variable @var{packet} to the error's auxiliary data packet. Then, the clauses 
+  will be checked for a match based on @var{errno-name}.
+  
+  The first clause that matches is executed, and its value is the value of the entire
+  @code{with-errno-handler} form. If no clause matches, the handler search continues.
+
+  Error clauses have two forms. In the first type of clause, the @var{errno} forms are valid 
+  @var{errno-name}s, as defined @seclink["errno-enum-sec"]{here}. For example, @code{pipe} or 
+  @code{wouldblock}. They are evaluated and compared to the errno corresponding to OS error number
+  returned in the exception. An @code{else} clause matches any @code{errno} value. 
+
+  Note that the @var{errno-os-number} and @var{packet} variables bound at the top of @var{handler-spec}
+  are lexically visible to the error clauses.
+  
+  Example:
+  @codeblock{
+    (with-errno-handler
+      ((errno-num packet) ; Only handle 3 particular errors.
+      ((wouldblock again) ; This clause matches for wouldblock OR again errnos
+        (display "Please retry")
+        #t)
+      ((acces)            ; This clause only matches for acces errno
+        (display "Not allowed access!")
+        #f)
+      (else               ; Remake exception packet & propagate
+        (raise-errno-error errno-num 'handler "Unexpected error")))
+
+      (foo frobbotz)
+      (blatz garglemumph))}
+  }
+ 
 @section{Interactive Mode and Error Handling}
 Scsh runs in two modes: interactive and script mode. It starts up in interactive mode if the scsh
 interpreter is started up with no script argument. Otherwise, scsh starts up in script mode.  The
@@ -108,3 +111,141 @@ dismiss from the error. In script mode, the default error handler causes the scs
 
 When scsh forks a child with @code{(fork)}, the child resets to script mode.
 This can be overridden if the programmer wishes.
+
+@section[#:tag "errno-enum-sec"]{Named and Anonymous @code{errno}s}
+@margin-note{
+  Not all named @code{errno}s are available from all OS's and there may be multiple names for a single
+  OS @code{errno} number. If you ever need an @code{errno} that is not named in the available list, 
+  simply create an anonymous @code{errno} with @code{integer->errno}.
+}
+Scsh uses Scheme48's @code{errno} objects for representing error codes. There are two varieties of 
+@code{errno}s available, named and anonymous. A named @code{errno} is one for which we have a 
+symbolic name, such as @code{(errno fault)} or @code{(errno pipe)}. Anonymous @code{errno}s, 
+for which we only have the current operating system's errno number, have no meaning in other 
+operating systems. Named errnos preserve their meaning in image files. 
+
+The syntax for @code{errno} and valid @var{named-error}s are as follows:
+@defform[(errno named-error)]
+@tabular[
+  #:style 'boxed
+  #:row-properties '((bottom-border top-border) ())
+  #:sep @hspace[2]
+    (list 
+      (list ""  @bold{Named error  } @bold{Description})
+      (list ""  @code{toobig}         " [E2BIG] Argument list too long.")
+      (list ""  @code{acces}		      " Permission denied.")
+      (list ""  @code{addrinuse}		  " Address in use.")
+      (list ""  @code{addrnotavail}	  " Address not available.")
+      (list ""  @code{afnosupport}		" Address family not supported.")
+      (list ""  @code{again}		      " Resource unavailable, try again (may be the same value as [EWOULDBLOCK]).")
+      (list ""  @code{already}		    " Connection already in progress.")
+      (list ""  @code{badf}		        " Bad file descriptor.")
+      (list ""  @code{badmsg}		      " Bad message.")
+      (list ""  @code{busy}		        " Device or resource busy.")
+      (list ""  @code{canceled}		    " Operation canceled.")
+      (list ""  @code{child}		      " No child processes.")
+      (list ""  @code{connaborted}		" Connection aborted.")
+      (list ""  @code{connrefused}		" Connection refused.")
+      (list ""  @code{connreset}		  " Connection reset.")
+      (list ""  @code{deadlk}		      " Resource deadlock would occur.")
+      (list ""  @code{destaddrreq}		" Destination address required.")
+      (list ""  @code{dom}		        " Mathematics argument out of domain of function.")
+      (list ""  @code{dquot}		      " Reserved.")
+      (list ""  @code{exist}		      " File exists.")
+      (list ""  @code{fault}		      " Bad address.")
+      (list ""  @code{fbig}	      	  " File too large.")
+      (list ""  @code{hostunreach}		" Host is unreachable.")
+      (list ""  @code{idrm}	      	  " Identifier removed.")
+      (list ""  @code{ilseq}	      	" Illegal byte sequence.")
+      (list ""  @code{inprogress}		  " Operation in progress.")
+      (list ""  @code{intr}	      	  " Interrupted function.")
+      (list ""  @code{inval}     		  " Invalid argument.")
+      (list ""  @code{io}	            " I/O error.")
+      (list ""  @code{isconn}	    	  " Socket is connected.")
+      (list ""  @code{isdir}	       	" Is a directory.")
+      (list ""  @code{loop}		        " Too many levels of symbolic links.")
+      (list ""  @code{mfile}	      	" Too many open files.")
+      (list ""  @code{mlink}	       	" Too many links.")
+      (list ""  @code{msgsize}		    " Message too large.")
+      (list ""  @code{multihop}		    " Reserved.")
+      (list ""  @code{nametoolong}		" Filename too long.")
+      (list ""  @code{netdown}	    	" Network is down.")
+      (list ""  @code{netreset}	  	  " Connection aborted by network.")
+      (list ""  @code{netunreach}		  " Network unreachable.")
+      (list ""  @code{nfile}		      " Too many files open in system.")
+      (list ""  @code{nobufs}	    	  " No buffer space available.")
+      (list ""  @code{nodata}	    	  " [XSR]  No message is available on the STREAM head read queue.") 
+      (list ""  @code{nodev}		      " No such device.")
+      (list ""  @code{noent}	        " No such file or directory.")
+      (list ""  @code{noexec}	    	  " Executable file format error.")
+      (list ""  @code{nolck}		      " No locks available.")
+      (list ""  @code{nolink}	    	  " Reserved.")
+      (list ""  @code{nomem}	      	" Not enough space.")
+      (list ""  @code{nomsg}	      	" No message of the desired type.")
+      (list ""  @code{noprotoopt}		  " Protocol not available.")
+      (list ""  @code{nospc}		      " No space left on device.")
+      (list ""  @code{nosr}	      	  " [XSR]  No STREAM resources.") 
+      (list ""  @code{nostr}	       	" [XSR]  Not a STREAM.") 
+      (list ""  @code{nosys}		      " Function not supported.")
+      (list ""  @code{notconn}		    " The socket is not connected.")
+      (list ""  @code{notdir}		      " Not a directory.")
+      (list ""  @code{notempty}	  	  " Directory not empty.")
+      (list ""  @code{notsock}	    	" Not a socket.")
+      (list ""  @code{notsup}	    	  " Not supported.")
+      (list ""  @code{notty}		      " Inappropriate I/O control operation.")
+      (list ""  @code{nxio}		        " No such device or address.")
+      (list ""  @code{opnotsupp} 		  " Operation not supported on socket.")
+      (list ""  @code{overflow}	  	  " Value too large to be stored in data type.")
+      (list ""  @code{perm}		        " Operation not permitted.")
+      (list ""  @code{pipe}	      	  " Broken pipe.")
+      (list ""  @code{proto}		      " Protocol error.")
+      (list ""  @code{protonosupport} " Protocol not supported.")
+      (list ""  @code{prototype}	   	" Protocol wrong type for socket.")
+      (list ""  @code{range}	      	" Result too large.")
+      (list ""  @code{rofs}	      	  " Read-only file system.")
+      (list ""  @code{spipe}	      	" Invalid seek.")
+      (list ""  @code{srch}	      	  " No such process.")
+      (list ""  @code{stale}	      	" Reserved.")
+      (list ""  @code{time}	       	  " [XSR]  Stream ioctl() timeout.") 
+      (list ""  @code{timedout}	  	  " Connection timed out.")
+      (list ""  @code{txtbsy}	    	  " Text file busy.")
+      (list ""  @code{wouldblock}		  " Operation would block (may be the same value as [EAGAIN]).")
+      (list ""  @code{xdev}		        " Cross-device link.")
+  )]
+
+@deftogether[(@defproc[(integer->errno  [os-number integer?]) errno]
+              @defproc[(name->errno     [name symbol?]) (values errno or #f)])]{
+  These are alternative constructors for @code{errno}. @code{integer->errno} uses the specific 
+  @var{os-number} to construct @code{errno}, resolves the name if the number is associated with a named
+  error. @code{name->errno} looks up an @code{errno} by @var{name}, returns #f if fails to resolve name.
+}
+
+@deftogether[(@defproc[(errno?  [x any]) boolean]
+              @defproc[(errno=? [errno0 errno?]
+                                [errno1 errno?]) boolean]
+              @defproc[(errno-name       [errno errno?]) (values symbol or #f)]
+              @defproc[(errno-os-number  [errno errno?]) integer])]{
+  @code{errno?} and @code{errno=?} are a predicate and comparator for @code{errno}, 
+  respecitvely. 
+  
+  @code{errno-name} is an accessor for a name of an @code{errno}. If the @code{errno} is named, then
+  a symbol is returned; if it is anonymous, #f is returned. @code{errno-os-number} is an accessor
+  for an @code{errno}'s number. 
+}
+
+@; TODO - should it be exposed? I think yes for 34, no for 35?
+@section[#:tag "s48-exceptions-sec"]{Scheme 48's Exception Handling}
+
+Scheme 48 implements 
+@hyperlink["https://srfi.schemers.org/srfi-34/srfi-34.html"]{SRFI 34: Exception Handling for Programs}
+and @hyperlink["https://srfi.schemers.org/srfi-35/srfi-35.html"]{SRFI 35: Conditions}, 
+which is exposed to scsh users. 
+
+The system reports syscall errors by raising exceptions with compound conditions. The scsh-specific
+condition type is @code{&os-error}, which has a field @code{code} that contains the system error number.
+The accessor is @code{os-error-code}. 
+
+Additoinally, standard condition types are also included, such as @code{&who} for specifying the offending
+procedure (accessor @code{condition-who}), @code{&message} for reporting the OS error message
+(accessor @code{condition-message}) and @code{&irritants} for specifying optional list of 
+offending arguments (accessor @code{condition-irritants}). 

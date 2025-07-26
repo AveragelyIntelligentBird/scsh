@@ -100,14 +100,13 @@
   (open scheme ascii bitwise constance (subset srfi-1 (fold)))
   (files tty-consts))
 
-(define-structure scsh-errnos
-  (export with-errno-handler*
-          errno-error
-          (with-errno-handler :syntax))
+(define-structure scsh-errnos scsh-errors-interface
   (open scheme
         handle
         conditions
         exceptions
+        (subset primitives (os-error-message))
+        (subset os-strings (byte-vector->os-string os-string->string))
         posix-errnos)
   (files scsh-condition))
 
