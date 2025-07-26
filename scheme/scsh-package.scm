@@ -108,7 +108,7 @@
         (subset primitives (os-error-message))
         (subset os-strings (byte-vector->os-string os-string->string))
         posix-errnos)
-  (files scsh-condition))
+  (files errno-handling))
 
 (define-structure scsh-syscall-support
   (export byte-vector->string

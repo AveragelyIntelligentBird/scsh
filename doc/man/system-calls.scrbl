@@ -8,7 +8,7 @@ is discussed separately in @secref["networking-chapter"].
 
 @local-table-of-contents[]
 
-@include-section["syscall-err.scrbl"]
+@include-section["syscalls/errnos.scrbl"]
 @include-section["syscalls/io.scrbl"]
 @include-section["syscalls/filesystem.scrbl"]
 @include-section["syscall-proc.scrbl"]

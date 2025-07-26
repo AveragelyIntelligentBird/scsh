@@ -97,7 +97,7 @@ SCHEME = scheme/command-line.scm \
 	 scheme/pty.scm \
 	 scheme/rdelim.scm \
 	 scheme/resource.scm \
-	 scheme/scsh-condition.scm \
+	 scheme/errno-handling.scm \
 	 scheme/scsh-interfaces.scm \
 	 scheme/scsh-package.scm \
 	 scheme/scsh-read.scm \
