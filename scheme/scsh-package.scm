@@ -488,6 +488,7 @@
         threads
         thread-fluids
         handle
+        scsh-stdio
         (subset signals (error warn))
         (subset srfi-13 (string-index))
         (subset command-levels (session-started? set-batch-mode?!))
@@ -561,6 +562,9 @@
                              open-output-file))
         (subset i/o (current-error-port))
         (subset scsh-utilities (define-simple-syntax))
+        (subset i/o-internal (call-with-current-input-port
+                              call-with-current-output-port
+                              call-with-current-noise-port))
         scsh-fdports)
   (files (ports stdio)))
 

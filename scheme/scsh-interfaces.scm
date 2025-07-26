@@ -71,23 +71,15 @@
     open-fdes
 
 	  pipe
-	  with-current-output-port*
-	  with-current-error-port
-	  with-current-output-port
-	  with-current-input-port
 	  flush-all-ports
-	  with-current-error-port*
-	  with-current-input-port*
 	  close-after
 	  error-output-port
 	  close
 	  release-port-handle
 	  flush-all-ports-no-threads
-	  with-error-output-port*
 	  release-port-handle
 	  seek/end
 	  port-revealed
-	  with-error-output-port
 	  seek/delta
 	  tell
 	  seek
@@ -899,6 +891,14 @@
 (define-interface scsh-stdio-interface
   (export stdports->stdio
           with-stdio-ports*
+          with-current-error-port
+	  with-current-output-port
+	  with-current-input-port
+	  with-current-output-port*
+	  with-current-error-port*
+	  with-current-input-port*
+    with-error-output-port
+	  with-error-output-port*
           (with-stdio-ports :syntax)))
 
 (define-interface scsh-ptys-interface
