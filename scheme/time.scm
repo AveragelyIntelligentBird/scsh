@@ -1,22 +1,14 @@
-;;; Time interface for scsh.
-;;; Copyright (c) 1994 by Olin Shivers.
+;;; Time and Date interface ---------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Extends work done by Olin Shivers
 
-;;; Should I have a (FILL-IN-DATE! date) procedure that fills in
-;;; the redundant info in a date record?
-;;; - month-day & month defined -> week-day & year-day filled in.
-;;; - month-day and year-day filled in from week-day and year-day
-;;;   (not provided by mktime(), but can be synthesized)
-;;; - If tz-secs and tz-name not defined, filled in from current time zone.
-;;; - If tz-name not defined, fabbed from tz-secs.
-;;; - If tz-secs not defined, filled in from tz-name.
+;; A TIME is an instant in the history of the universe; it is location
+;; independent, barring relativistic effects. It is measured as the
+;; number of seconds elapsed since "epoch" -- January 1, 1970 UTC.
 
-;;; A TIME is an instant in the history of the universe; it is location
-;;; independent, barring relativistic effects. It is measured as the
-;;; number of seconds elapsed since "epoch" -- January 1, 1970 UTC.
-
-;;; A DATE is a *local* name for an instant in time -- which instant
-;;; it names depends on your time zone (February 23, 1994 4:37 pm happens
-;;; at different moments in Boston and Hong Kong).
+;; A DATE is a *local* name for an instant in time -- which instant
+;; it names depends on your time zone (February 23, 1994 4:37 pm happens
+;; at different moments in Boston and Hong Kong).
 
 ;;; DATE definition
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -203,4 +195,13 @@
   reinitialize-time-ticks-sec
   ((%ticks/sec CLOCKS_PER_SEC)))
 
-(define (ticks/sec) %ticks/sec)
+(define (ticks/sec) %ticks/sec)'
+
+;;; Should I have a (FILL-IN-DATE! date) procedure that fills in
+;;; the redundant info in a date record?
+;;; - month-day & month defined -> week-day & year-day filled in.
+;;; - month-day and year-day filled in from week-day and year-day
+;;;   (not provided by mktime(), but can be synthesized)
+;;; - If tz-secs and tz-name not defined, filled in from current time zone.
+;;; - If tz-name not defined, fabbed from tz-secs.
+;;; - If tz-secs not defined, filled in from tz-name.
