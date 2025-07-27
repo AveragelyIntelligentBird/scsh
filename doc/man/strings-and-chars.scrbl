@@ -11,6 +11,10 @@ Bytes are small integers between 0 and 255.
 @section[#:tag "text-codecs-sec"]{Text encodings}
 port-text-codec set-port-text-codec!
 @subsection{Unicode: UTF-8, UTF-16, UTF-32}
+
+srfi-75
+srfi-14 is Unicode compliant
+
 @subsection{ASCII}
 @subsection{Latin-1}
 

@@ -185,20 +185,23 @@ buffered input on stdin can reset @code{(current-input-port)} to block buffering
   This procedure flushes all open output ports.
 }
 
+@; TODO maybe move to strings and characters
 @section{String Ports}
-  Scheme 48 has string ports, which are exposed to scsh users.
+Scheme 48 implements 
+@hyperlink["https://srfi.schemers.org/srfi-6/srfi-6.html"]{SRFI 6: Basic String Ports}, 
+and its interface is exposed to scsh users.
 
-@defproc[(make-string-input-port [string string?]) port?]{
+@defproc[(make-string-input-port [string string?]) port]{
   Returns a port that reads characters from the supplied string.
 }
 
-@deftogether[(@defproc[(make-string-output-port) port?]
-              @defproc[(string-output-port-output [port port?]) string?])]{
+@deftogether[(@defproc[(make-string-output-port) port]
+              @defproc[(string-output-port-output [port port?]) string])]{
   A string output port is a port that collects the characters given to it into a string. The
   accumulated string is retrieved by applying @code{string-output-port-output} to the port.
 }
 
-@defproc[(call-with-string-output-port [procedure (-> port? any)]) string?]{
+@defproc[(call-with-string-output-port [procedure (-> port? any)]) string]{
   The @var{procedure} value is called on a port. When it returns, @code{call-with-string-output-port}
   returns a string containing the characters that were written to that port during the execution of
   @var{procedure}.
