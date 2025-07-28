@@ -82,11 +82,11 @@ The bindings cannot be mutated with @code{set!} as it was in earlier releases, s
 provides procedures for temporarily installing alternative ports to these bindings. 
 
 
-@deftogether[(@defproc[(with-current-input-port* [port fdport?] [thunk (-> any)]) any]
-              @defproc[(with-current-output-port* [port fdport?] [thunk (-> any)]) any]
-              @defproc[(with-error-output-port* [port fdport?] [thunk (-> any)]) any]
+@deftogether[(@defproc[(with-current-input-port* [port fdport?] [thunk (-> any)]) (values value/s of thunk)]
+              @defproc[(with-current-output-port* [port fdport?] [thunk (-> any)]) (values value/s of thunk)]
+              @defproc[(with-error-output-port* [port fdport?] [thunk (-> any)]) (values value/s of thunk)]
               @defproc[(with-current-ports* [input fdport?] [output fdport?] [error fdport?] 
-                                            [thunk (-> any)]) any])]{
+                                            [thunk (-> any)]) (values value/s of thunk)])]{
   These procedures install @var{port} as the current input, current output, and error output port,
   respectively, for the duration of a call to @var{thunk} and return @var{thunk}'s value(s).
 
@@ -166,7 +166,7 @@ the shell does buffered reads, it might "steal" input intended for a subprocess.
 all shells, including sh, csh, and scsh, read stdin unbuffered. Applications that can tolerate 
 buffered input on stdin can reset @code{(current-input-port)} to block buffering for higher performance.
 
-@defproc[(set-port-buffering [port port?] [policy bufpol?] [size integer? channel-buffer-size]) undefined]{
+@defproc[(set-port-buffering [port port?] [policy bufpol?] [size integer? channel-buffer-size]) unspecific]{
   This procedure allows the programmer to assign a particular I/O buffering @var{policy} to a 
   given @var{port}, and to choose the @var{size} of the associated buffer. It may only be used on new 
   ports, i.e., before I/O is performed on the ports.
@@ -176,16 +176,16 @@ buffered input on stdin can reset @code{(current-input-port)} to block buffering
   to be @code{bufpol/none}.
 }
 
-@defproc[(force-output [fdport fdport?]) undefined]{
+@defproc[(force-output [fdport fdport?]) unspecific]{
   This procedure flushes buffered output when applied to a output port and does nothing when applied
   to an input port. It raises a write-error exception on error. Returns no value.
 }
 
-@defproc[(flush-all-ports) undefined]{
-  This procedure flushes all open output ports.
+@defproc[(flush-all-ports) boolean]{
+  This procedure flushes all open output ports. The return value is true if at least one port has been
+  flushed; false otherwise.
 }
 
-@; TODO maybe move to strings and characters
 @section{String Ports}
 Scheme 48 implements 
 @hyperlink["https://srfi.schemers.org/srfi-6/srfi-6.html"]{SRFI 6: Basic String Ports}, 
@@ -350,7 +350,7 @@ flag with @code{set-file-status-flags!}.
 
 @deftogether[(@defproc[(close-on-exec?      [fd/port (or integer? fdport?)]) boolean]
               @defproc[(set-close-on-exec?! [fd/port (or integer? fdport?)] 
-                                            [cloexec? boolean?]) undefined])]{
+                                            [cloexec? boolean?]) unspecific])]{
   These procedures provide the functionality of @code{fcntl()} with @code{F_GETFD}/@code{F_SETFD} 
   operations. Since, pretty much universally, the only flag associated with file descriptors is
   @code{FD_CLOEXEC}, we provide procedures just for this flag.
@@ -367,7 +367,7 @@ flag with @code{set-file-status-flags!}.
 
 @deftogether[(@defproc[(file-status-flags      [fd/port (or integer? fdport?)]) file-flags]
               @defproc[(set-file-status-flags! [fd/port (or integer? fdport?)] 
-                                               [flags   (or file-flags? integer?)]) undefined])]{
+                                               [flags   (or file-flags? integer?)]) unspecific])]{
   These procedures provide the functionality of @code{fcntl()} with @code{F_GETFL}/@code{F_SETFL} 
   operations, i.e. allows reading and writing of an open file's status flags.
 
@@ -575,7 +575,7 @@ Additoinally, each entry is associated with a @var{revealed} count, which discus
     (close (fdes->outport fd))}
 }
 
-@defproc[(close-after [port port?] [consumer (-> port? any)]) any]{
+@defproc[(close-after [port port?] [consumer (-> port? any)]) (values value/s of consumer)]{
   Returns @code{(consumer port)}, but closes the port on return. No dynamic-wind magic.
 }
 
@@ -677,12 +677,12 @@ information.
   Return the port's revealed count if positive, otherwise #f.
 }
 
-@defproc[(release-port-handle [port fdport?]) undefined]{
+@defproc[(release-port-handle [port fdport?]) unspecific]{
   Decrement @var{port}'s revealed count.
 }
 
 @defproc[(call/fdes [fd/port (or integer? fdport?)]
-                    [consumer (-> integer? any)]) any]{
+                    [consumer (-> integer? any)]) (values value/s of consumer)]{
   Calls @var{consumer} on a file descriptor; takes care of revealed bookkeeping. If @var{fd/port} is a
   file descriptor, this is just @code{(consumer fd/port)}. If @var{fd/port} is a port, calls
   @var{consumer} on its underlying file descriptor. While @var{consumer} is running, the port's

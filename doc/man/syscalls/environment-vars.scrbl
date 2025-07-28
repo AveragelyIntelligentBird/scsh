@@ -3,7 +3,7 @@
 @title{Environment variables}
 
 @deftogether[(@defproc[(getenv [key string?]) string]
-              @defproc[(setenv [key string?] [val (or string? #f)]) undefined])]{
+              @defproc[(setenv [key string?] [val (or string? #f)]) unspecific])]{
   These functions get and set the process environment, stored in the external C variable 
   @code{char **environ}. An environment variable @var{key} is a string. 
   
@@ -23,12 +23,12 @@
   }      
 }
 
-@defproc[(alist->env [alist (listof string->string)]) undefined]{
+@defproc[(alist->env [alist (listof string->string)]) unspecific]{
   @var{alist} must be an association list whose keys are all strings, and whose values are all 
   either strings or string lists. 
   
   String lists are converted to colon lists (see below). The @var{alist} is installed as the current
-  Unix environment (i.e., converted to a null-terminated C vector of "var=val" strings which is
+  Unix environment (i.e., converted to a null-terminated C vector of "key=val" strings which is
   assigned to the global @code{char **environ}).
   @codeblock{
     ;;; Note $PATH entry is converted 

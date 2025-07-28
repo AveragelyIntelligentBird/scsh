@@ -1,6 +1,6 @@
 #lang scribble/manual 
 
-@title{Time}
+@title[#:tag "datetime-chap"]{Date and Time}
 
 Scsh's time system is fairly sophisticated, particularly with respect to its careful treatment of 
 time zones. However, casual users shouldn't be intimidated; all of the complexity is optional, and 

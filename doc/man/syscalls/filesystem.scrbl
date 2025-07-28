@@ -8,16 +8,16 @@ string-processing procedures are documented in @secref["manipulating-filenames"]
 @section{Manipulating Filesystem Objects}
 @deftogether[(@defproc[(create-directory  [fname string?] 
                                           [mode file-mode? (file-mode all)] 
-                                          [override? (or #f 'query any) #f]) undefined]
+                                          [override? (or #f 'query any) #f]) unspecific]
               @defproc[(create-fifo [fname string?]  
                                     [mode file-mode? (file-mode all)] 
-                                    [override? (or #f 'query any) #f]) undefined]
+                                    [override? (or #f 'query any) #f]) unspecific]
               @defproc[(create-hard-link  [oldname string?] 
                                           [newname string?] 
-                                          [override? (or #f 'query any) #f]) undefined]
+                                          [override? (or #f 'query any) #f]) unspecific]
               @defproc[(create-symlink    [oldname string?] 
                                           [newname string?] 
-                                          [override? (or #f 'query any) #f]) undefined])]{
+                                          [override? (or #f 'query any) #f]) unspecific])]{
 @margin-note{
       Currently, if you try to create a hard or symbolic link from a file to itself, 
       you will error out with @var{override?} false, and simply delete your file with 
@@ -40,9 +40,9 @@ the given file name:
                                                 creating the new object}))]
       }
 
-@deftogether[(@defproc[(delete-directory        [fname string?]) undefined]
-              @defproc[(delete-file             [fname string?]) undefined]
-              @defproc[(delete-filesys-object   [fname string?]) undefined])]{
+@deftogether[(@defproc[(delete-directory        [fname string?]) unspecific]
+              @defproc[(delete-file             [fname string?]) unspecific]
+              @defproc[(delete-filesys-object   [fname string?]) unspecific])]{
 These procedures delete objects from the filesystem. @code{delete-directory} and @code{delete-file}
 delete only the specified type of filesys object, while @code{delete-filesys-object} procedure will
 delete an object of any type from the file system: files, (empty) directories, symlinks, fifos, etc.
@@ -65,40 +65,39 @@ Return the filename referenced by the symbolic link @var{fname}.
 
 @defproc[(rename-file   [old-fname string?] 
                         [new-fname string?] 
-                        [override? (or #f 'query any) #f]) undefined]{
+                        [override? (or #f 'query any) #f]) unspecific]{
 @var{override?} follows the same logic as in @code{create-directory} and co above. If you choose to
 override an existing object, then @var{old-fname} and @var{new-fname} must type-match --- either 
 both directories, or both non-directories. This is required by the semantics of Unix @code{rename()}.
 }
 
 @deftogether[(@defproc[(set-file-mode  [fname/fd/port (or string? integer? fdport?)] 
-                                       [mode file-mode?]) undefined]
+                                       [mode file-mode?]) unspecific]
               @defproc[(set-file-owner [fname/fd/port (or string? integer? fdport?)] 
-                                       [uid integer?]) undefined]
+                                       [uid integer?]) unspecific]
               @defproc[(set-file-group [fname/fd/port (or string? integer? fdport?)] 
-                                       [gid integer?]) undefined])]{
+                                       [gid integer?]) unspecific])]{
 These procedures set the permission bits (see @secref["file-modes-sec"]), owner id, and group id of a 
 file, respectively. The file can be specified by giving the file name, or either an integer file 
 descriptor or a port open on the file. Setting file user ownership usually requires root privileges.
 }
 
-@; TODO link in time
 @defproc[(set-file-times [fname string?]
-                         [access-time integer? (current-time)]
-                         [mod-time integer? (current-time)]) undefined]{
+                         [access-time integer? (time)]
+                         [mod-time integer? (time)]) unspecific]{
 This procedure sets the access and modified times for the file @var{fname} to the supplied values 
-(see (link to sec:time) for the scsh representation of time). If neither time argument is supplied, 
+(see @seclink["datetime-chap"]{scsh representation of time}). If neither time argument is supplied, 
 they are both taken to be the current time. You must provide both times or neither. If the procedure
 completes successfully, the file's time of last status-change (@code{ctime}) is set to the current time.
 }
 
-@defproc[(sync-file [fd/port (or integer? fdport?)]) undefined]{
+@defproc[(sync-file [fd/port (or integer? fdport?)]) unspecific]{
 Calling @code{sync-file} causes Unix to update the disk data structures for a given file. If
 @var{fd/port} is a port, any buffered data it may have is first flushed.
 }
 
 @defproc[(truncate-file [fname/fd/port (or string? integer? fdport?)] 
-                        [len integer?]) undefined]{
+                        [len integer?]) unspecific]{
 Truncate the specified file to @var{len} bytes in length.
 }
 
@@ -321,7 +320,7 @@ filenames with whitespace in their names will be split into separate entries.
 @deftogether[(@defproc[(open-directory-stream   [dir string?]) directory-stream?]
               @defproc[(directory-stream?       [maybe-directory-stream any]) boolean?]
               @defproc[(read-directory-stream   [directory-stream directory-stream?]) (or string? #f)]
-              @defproc[(close-directory-stream  [directory-stream directory-stream?]) undefined])]{
+              @defproc[(close-directory-stream  [directory-stream directory-stream?]) unspecific])]{
 These functions implement a direct interface to the @code{opendir()} / @code{readdir()} /
 @code{closedir()} family of functions for processing directory streams.
 

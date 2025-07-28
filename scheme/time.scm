@@ -195,7 +195,7 @@
   reinitialize-time-ticks-sec
   ((%ticks/sec CLOCKS_PER_SEC)))
 
-(define (ticks/sec) %ticks/sec)'
+(define (ticks/sec) %ticks/sec)
 
 ;;; Should I have a (FILL-IN-DATE! date) procedure that fills in
 ;;; the redundant info in a date record?

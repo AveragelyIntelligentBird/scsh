@@ -1,12 +1,13 @@
-#lang scribble/doc
-@(require scribble/manual "def-with-nolink.rkt")
+#lang scribble/manual
 
 @title{Processes}
 
-@deftogether[(@defproc/nolink[(exec [program string?] [arg string?] ...) any]
-              @defproc/nolink[(exec-path [program string?] [arg string?] ...) any]
-              @defproc/nolink[(exec/env [program string?] [environment (or/c (listof (cons/c string? string?)) #t)] [arg string?] ...) any]
-              @defproc/nolink[(exec-path/env [program string?] [environment (or/c (listof (cons/c string? string?)) #t)] [arg string?] ...) any])]{
+@deftogether[(@defproc[(exec      [program string?] [arg string?] ...) unspecific]
+              @defproc[(exec-path [program string?] [arg string?] ...) any]
+              @defproc[(exec/env  [program string?] 
+                                  [env (or/c (listof (cons/c string? string?)) #t)] 
+                                  [arg string?] ...) any]
+              @defproc[(exec-path/env [program string?] [environment (or/c (listof (cons/c string? string?)) #t)] [arg string?] ...) any])]{
 The @code{.../env} variants take an environment specified as a string to string alist. An
 environment of @code{#t} is taken to mean the current process' environment (i.e., the value of the
 external char @code{**environ}).
@@ -41,8 +42,8 @@ These procedures never return under any circumstances. As with any other system 
 error, they raise an exception.
 }
 
-@deftogether[(@defproc/nolink[(%exec [program string?] [arglist (listof string?)] [env (or/c #t (listof (pair/c string? string?)))]) any]
-              @defproc/nolink[(exec-path-search [fname string?] [pathlist (listof string?)]) (or/c string? #f)])]{
+@deftogether[(@defproc[(%exec [program string?] [arglist (listof string?)] [env (or/c #t (listof (pair/c string? string?)))]) any]
+              @defproc[(exec-path-search [fname string?] [pathlist (listof string?)]) (or/c string? #f)])]{
 The @code{%exec} procedure is the low-level interface to the system call. The @var{arglist}
 parameter is a list of arguments; @var{env} is either a string to string alist or @code{#t}. The new
 program's @code{argv[0]} will be taken from @code{(car arglist)}, @emph{not} from @var{prog}. An
@@ -65,14 +66,14 @@ when the exec operation fails.
 See @code{$path} and @code{exec-path-list}, below.
 }
 
-@deftogether[(@defproc/nolink[(exit [status integer? 0]) any]
-              @defproc/nolink[(%exit [status integer? 0]) any])]{
+@deftogether[(@defproc[(exit [status integer? 0]) any]
+              @defproc[(%exit [status integer? 0]) any])]{
 These procedures terminate the current process with a given exit status. The default exit status is
 0. The low-level @code{%exit} procedure immediately terminates the process without flushing buffered
 output.
 }
 
-@defproc/nolink[(call-terminally [thunk (-> (values any ...))]) any]{
+@defproc[(call-terminally [thunk (-> (values any ...))]) any]{
 @code{call-terminally} calls its thunk. When the thunk returns, the process exits. Although
 @code{call-terminally} could be implemented as
 
@@ -84,12 +85,12 @@ bindings are discarded. This can allow the old stack and dynamic environment to 
 (assuming this data is not reachable through some live continuation).
 }
 
-@defproc/nolink[(suspend) undefined]{
+@defproc[(suspend) unspecific]{
 Suspend the current process with a SIGSTOP signal.
 }
 
-@deftogether[(@defproc/nolink[(fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc/nolink[(%fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@deftogether[(@defproc[(fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
+              @defproc[(%fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
 @code{fork} with no arguments or @code{#f} instead of a thunk is like C @code{fork()}. In the parent
 process, it returns the child's @emph{process object} (see below for more information on process
 objects). In the child process, it returns @code{#f}.
@@ -104,8 +105,8 @@ The optional boolean argument @var{continue-threads?} specifies whether the curr
 continue to run in the child or not. The default is @code{#f}.
 }
 
-@deftogether[(@defproc/nolink[(fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc/nolink[(%fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@deftogether[(@defproc[(fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
+              @defproc[(%fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
 Like @code{fork} and @code{%fork}, but the parent and child communicate via a pipe connecting the
 parent's stdin to the child's stdout. These procedures side-effect the parent by changing his stdin.
 
@@ -151,8 +152,8 @@ process, only when the pipe will be referenced by Scheme code through one of the
 ports.
 }
 
-@deftogether[(@defproc/nolink[(fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc/nolink[(%fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@deftogether[(@defproc[(fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
+              @defproc[(%fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
 Like @code{fork/pipe}, but the pipe connections between the child and parent are specified by the
 connection list @var{conns}. See the
 
@@ -161,7 +162,202 @@ connection list @var{conns}. See the
 process form for a description of connection lists.
 }
 
-@section{Process objects and process reaping}
-@subsection{Issues with process reaping}
+@section[#:tag "proc-obj-sec"]{Process objects and process reaping}
+Scsh uses @as-index[@code{proc}] records to represent Unix processes, which we call 
+@emph{process objects}. They are created by the @code{fork} procedure, and have the following exposed 
+structure:
+@codeblock{
+    (define-record-type 
+      ; ... ;
+      proc?
+      (pid proc:pid)) 
+}
+
+The record is discriminated with the @as-index[@code{proc?}] predicate. The only exposed slot in a 
+@code{proc} record is the process' pid, the integer id assigned by Unix to the process. Is's accessor 
+is @code{proc:pid}. 
+
+@defproc[(pid->proc [pid integer?]
+                    [probe? any #f]) proc]{
+  This procedure maps integer Unix process ids to scsh process objects. It is intended for use mainly
+  in interactive and debugging code. 
+  
+  If there is no process object in the system indexed by the given @var{pid}, @code{pid->proc}'s 
+  action is determined by the @var{probe?} parameter, which defaults to #f.
+  @tabular[#:style 'boxed
+           #:row-properties '((bottom-border top-border) '())
+           #:sep @hspace[3]
+    (list (list "" @var{probe?} @bold{Return})
+      (list "" @code{#f}      "Signals error condition.")
+      (list "" @code{'create} "Create new proc object.")
+      (list "" @emph{other}   @code{#f}))]
+}
+
+Sometime after a child process terminates, scsh will perform a wait system call on the child in 
+background, caching the process' exit status in the child's proc object. This is called "reaping" 
+the process. Once the child has been waited, the Unix kernel can free the storage allocated for the 
+dead process' exit information, so process reaping prevents the process table from becoming 
+cluttered with un-waited dead child processes (a.k.a. "zombies"). This can be especially severe if 
+the scsh process never waits on child processes at all; if the process table overflows with forgotten 
+zombies, the OS may be unable to fork further processes.
+
+Reaping a child process moves its exit status information from the kernel into the scsh process, 
+where it is cached inside the child's process object. If the scsh user drops all pointers to the 
+process object, it will simply be garbage collected. On the other hand, if the scsh program retains 
+a pointer to the process object, it can use scsh's wait system call to synchronise with the child 
+and retrieve its exit status multiple times (this is not possible with simple Unix integer pids in 
+C -- the programmer can only wait on a pid once).
+
+Thus, process objects allow scsh programmer to do two things not allowed in other programming 
+environments:
+@itemlist[
+  @item{Subprocesses that are never waited on are still removed from the process table, and their 
+        associated exit status data is eventually automatically garbage collected.}
+  @item{Subprocesses can be waited on multiple times.}]
+
+However, note that once a child has exited, if the scsh programmer drops all pointers to the child's
+proc object, the child's exit status will be reaped and thrown away. This is the intended behaviour,
+and it means that integer pids are not enough to cause a process's exit status to be retained by 
+the scsh runtime. (This is because it is clearly impossible to GC   data referenced by integers.)
+
+As a convenience for interactive use and debugging, all procedures that take process objects will 
+also accept integer Unix pids as arguments, coercing them to the corresponding process objects. 
+Since integer process ids are not reliable ways to keep a child's exit status from being reaped and 
+garbage collected, programmers are encouraged to use process objects.
+
+@defproc[(autoreap-policy [policy policy?]) old-policy]{
+  The scsh programmer can choose different policies for automatic process reaping. 
+  The policy is determined by applying this procedure to one of the values 'early, 'late, or #f
+  (i.e., no autoreap).
+  @tabular[#:style 'boxed
+           #:row-properties '((bottom-border top-border) '())
+           #:sep @hspace[3]
+    (list (list "" @var{policy} @bold{Return})
+      (list "" @code{'early} "The child is reaped from the Unix kernel's process table into scsh as 
+                              soon as it dies. This is done by having a signal handler for the SIGCHLD
+                              signal reap the process.")
+      (list "" @code{'late}  "The child is not autoreaped until it dies and the scsh program drops 
+                              all pointers to its process object. That is, the process table is 
+                              cleaned out during garbage collection.")
+      (list "" @code{#f}     "If autoreaping is turned off, process reaping is completely under 
+                              control of the programmer, who can force outstanding zombies to be 
+                              reaped by manually calling the reap-zombies procedure (see below)."))]
+
+  Note that under any of the autoreap policies, a particular process p can be manually reaped into 
+  scsh by simply calling @code{(wait p)}. All zombies can be manually reaped with @code{(reap-zombies)}.
+ 
+  The @code{autoreap-policy} procedure returns the policy's previous value. Calling autoreap-policy 
+  with no arguments returns the current policy without no change.
+}      
+
+@defproc[(reap-zombies) boolean]{
+  This procedure reaps all outstanding exited child processes into scsh. It returns true if there 
+  are no more child processes to wait on, and false if there are outstanding processes still 
+  running or suspended. 
+}
+    
+@subsection{Issues with Reaping}
+
+Reaping a process does not reveal its process group at the time of death; this information is lost 
+when the process reaped. This means that a dead, reaped process is not eligible as a return value for
+a future @code{wait-process-group} call. This is not likely to be a problem for most code, as 
+programs almost never wait on exited processes by process group. Process group waiting is usually 
+applied to stopped processes, which are never reaped. So it is unlikely that this will be a problem 
+for most programs.
+
+Automatic process reaping is a useful programming convenience. However, if a program is careful to 
+wait for all children, and does not wish automatic reaping to happen, the programmer can simply turn 
+process autoreaping off.
+
+Programs that do not wish to use automatic process reaping should be aware that some scsh routines 
+create subprocesses but do not return the child's pid: @code{run/port*}, and its related procedures and 
+special forms (@code{run/strings}, et al.). Automatic process reaping will clean the child processes 
+created by these procedures out of the kernel's process table. If a program doesn't use process 
+reaping, it should either avoid these forms, or use @code{wait-any} to wait for the children to exit.
+
 @section{Process waiting}
-@section{Analysing process status codes}
+
+@defproc[(wait [proc/pid (or proc? integer?)] [flags integer? 0]) status]{
+  
+  This procedure waits until a child process exits, and returns its exit code. The 
+  @var{proc/pid} argument is either a process object (see @seclink["proc-obj-sec"]{here}) or an 
+  integer process id. @code{wait} returns the child's exit status code (or suspension code, if 
+  the @code{wait/stopped-children} option is used, see below). 
+  
+  Status values can be queried with the procedures in @secref["analyzing-procs-sec"].
+
+  The @var{flags} argument is an integer whose bits specify additional options. 
+  It is composed by or'ing together the following flags:
+  @tabular[#:style 'boxed
+           #:row-properties '((bottom-border top-border) '())
+           #:sep @hspace[3]
+    (list (list "" @bold{Wait flag} @bold{Unix flag} @bold{Description})
+      (list "" @as-index{@code{wait/poll}}             @code{WNOHANG}    
+            "Return #f immediately if child still active.")
+      (list "" @as-index{@code{wait/stopped-children}} @code{WUNTRACED}  
+            "Wait for suspend as well as exit.")
+      (list "" @as-index{@code{wait/cont-children}}    @code{WCONTINUED} 
+            "Wait for children being resumed with SIGCONT as well as exit."))]
+}      
+   	
+@defproc[(wait-any [flags integer? 0]) (values [proc status])]{
+  The optional @var{flags} argument is as for @code{wait}. This procedure waits for any child process 
+  to exit (or stop, or continue). It returns the process' process object and status code. 
+  
+  If there are no children left for which to wait, the two values [#f #t] are returned. 
+  If the wait/poll flag is used, and none of the children are immediately eligble for waiting, 
+  then the values [#f #f] are returned:
+    [#f #f] 	Poll, none ready
+    [#f #t] 	No children
+
+  @code{wait-any} will not return a process that has been previously waited by any other process-wait 
+  procedure (@code{wait}, @code{wait-any}, and @code{wait-process-group}). It will return reaped 
+  processes that haven't yet been waited.
+
+  The use of wait-any is deprecated.
+}   
+
+@defproc[(wait-process-group [proc/pid (or proc? integer?)] [flags integer? 0]) (values [proc status])]{
+  This procedure waits for any child whose process group is @var{proc/pid} (either a process object or
+  a pid). The @var{flags} argument is as for wait.
+
+  TODO LIES LIES LIES
+
+  Note that if the programmer wishes to wait for exited processes by process group, the program 
+  should take care not to use process reaping (section 3.4.1), as this 
+  loses process group information. However, most process-group waiting is for stopped 
+  processes (to implement job control), so this is rarely an issue, as stopped processes are not 
+  subject to reaping.
+}  
+    
+@section[#:tag "analyzing-procs-sec"]{Analysing process status codes}
+
+When a child process dies (or is suspended), its parent can call the wait procedure to recover the 
+exit (or suspension) status of the child. The exit status is a small integer that encodes information 
+describing how the child terminated. The bit-level format of the exit status is not defined by 
+POSIX; you must use the following three functions to decode one. However, if a child terminates 
+normally with exit code 0, POSIX does require wait to return an exit status that is exactly zero. 
+So (zero? status) is a correct way to test for non-error, normal termination, e.g.,
+@codeblock{
+  (if (zero? (run (rcp scsh.tar.gz lambda.csd.hku.hk:)))
+        (delete-file "scsh.tar.gz"))
+}
+
+@deftogether[(
+  @defproc[(status:exit-val [status status?]) (values integer or #f)]
+  @defproc[(status:stop-sig [status status?]) (values integer or #f)]
+  @defproc[(status:term-sig [status status?]) (values integer or #f)])]{
+
+  For a given status value produced by calling @code{wait}, exactly one of these routines will return 
+  a true value.
+
+  If the child process exited normally, @code{status:exit-val} returns the exit code for the child 
+  process (i.e., the value the child passed to exit or returned from main). Otherwise, this 
+  function returns @code{#f}
+
+  If the child process was suspended by a signal, @code{status:stop-sig} returns the signal that 
+  suspended the child. Otherwise, this function returns false.
+
+  If the child process terminated abnormally, @code{status:term-sig} returns the signal that 
+  terminated the child. Otherwise, this function returns false.
+}

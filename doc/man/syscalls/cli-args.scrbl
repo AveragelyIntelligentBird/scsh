@@ -3,8 +3,8 @@
 
 @title{Accessing command-line arguments}
 
-@deftogether[(@defproc[(command-line) (listof string?)]
-              @defthing[#:kind "global" command-line-arguments (listof string?)])]{
+@deftogether[(@defproc[(command-line) (values string list)]
+              @defthing[#:kind "global" command-line-arguments (values string list)])]{
 
 Calling @code{(command-line)} returns the complete argv string list, including the program. The list 
 of strings @code{command-line-arguments} contains the arguments passed to the scsh process on the 
@@ -24,20 +24,20 @@ and @code{command-line-arguments} is
 a fresh copy of the original argument list if @code{command-line-arguments} has been modified or is 
 lexically shadowed. }
 
-@defproc*[([(arg [arglist (listof string?)] [n integer?]) string?]
-           [(arg  [arglist (listof string?)] [n integer?] [default string?]) string?])]{
+@defproc*[([(arg [arglist (listof string?)] [n integer?]) string]
+           [(arg  [arglist (listof string?)] [n integer?] [default string?]) string])]{
 These procedures are useful for accessing arguments from argument lists. @code{arg} returns the nth 
 element of arglist. The index is 1-based. If @var{n} is too large, @var{default} is returned; if no 
 @var{default}, then an error is signaled.
 }
 
-@defproc*[([(arg* [arglist (listof string?)] [n integer?]) string?]
-           [(arg* [arglist (listof string?)] [n integer?] [default-thunk (-> any? string?)]) string?])]{
+@defproc*[([(arg* [arglist (listof string?)] [n integer?]) string]
+           [(arg* [arglist (listof string?)] [n integer?] [default-thunk (-> any string?)]) string])]{
 @code{arg*} is similar, except that the @var{default-thunk} is called to generate the default value.
 }
 
-@defproc*[([(argv [n integer?]) string?]
-           [(argv [n integer?] [default string?]) string?])]{
+@defproc*[([(argv [n integer?]) string]
+           [(argv [n integer?] [default string?]) string])]{
 @code{(argv n)} is simply @code{(arg (command-line) (+ n 1))}. The +1 offset ensures that the two 
 forms
 @codeblock{

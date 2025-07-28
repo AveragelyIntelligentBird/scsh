@@ -3,7 +3,7 @@
 @title{Process state}
 
 @deftogether[(@defproc[(umask) file-mode]
-              @defproc[(set-umask   [perms (or file-mode? integer?)]) undefined]
+              @defproc[(set-umask   [perms (or file-mode? integer?)]) unspecific]
               @defproc[(with-umask* [perms (or file-mode? integer?)] [thunk (-> any)]) (values value/s of thunk)]
               @defform[(with-umask  [perms (or file-mode? integer?)] body ...+)])]{
   The process' current umask is retrieved with @code{(umask)}, and set with @code{(set-umask perms)}.
@@ -20,7 +20,7 @@
 }
 
 @deftogether[(@defproc[(cwd) string]
-              @defproc[(chdir [path string? home-directory]) undefined]
+              @defproc[(chdir [path string? home-directory]) unspecific]
               @defproc[(with-cwd* [path string?] [thunk (-> any)]) (values value/s of thunk)]
               @defform[(with-cwd  [path string?] body ...+)])]{
   The process' current working directory is retrieved with @code{(cwd)}, and set with 
@@ -37,8 +37,8 @@
 @deftogether[(@defproc[(pid) fixnum]
               @defproc[(parent-pid) fixnum]
               @defproc[(process-group) fixnum]
-              @defproc*[([(set-process-group [process-group integer?]) undefined]
-                         [(set-process-group [proc/pid (or integer? proc-obj?)] [process-group integer?]) undefined])])]{
+              @defproc*[([(set-process-group [process-group integer?]) unspecific]
+                         [(set-process-group [proc/pid (or integer? proc-obj?)] [process-group integer?]) unspecific])])]{
   @code{(pid)} and @code{(parent-pid)} retrieve the process id for the current process and its parent.
   @code{(process-group)} returns the process group of the current process. 
   
@@ -49,14 +49,14 @@
 }
 
 @; TODO priority stuff?
-@; (set-priority which who priority)     --->     undefined         (procedure) 
+@; (set-priority which who priority)     --->     unspecific         (procedure) 
 @; (priority which who)     --->     fixnum         (procedure) 
-@; (nice [proc/pid delta])     --->     undefined         (procedure) 
+@; (nice [proc/pid delta])     --->     unspecific         (procedure) 
 
 @deftogether[(@defproc[(user-uid) integer]
-              @defproc[(set-uid [uid integer?]) undefined]
+              @defproc[(set-uid [uid integer?]) unspecific]
               @defproc[(user-effective-uid) integer]
-              @defproc[(set-user-effective-uid [uid integer?]) undefined]
+              @defproc[(set-user-effective-uid [uid integer?]) unspecific]
               @defproc[(with-user-effective-uid* [uid integer?] [thunk (-> any)]) (values value/s of thunk)]
               @defform[(with-user-effective-uid  [uid integer?] body ...+)])]{
   These routines get and set the effective and real user ids. The @code{set-uid} routine correspond to
@@ -69,9 +69,9 @@
 
 @deftogether[(@defproc[(user-gid) integer]
               @defproc[(user-supplementary-gids) (values fixnum list)]
-              @defproc[(set-gid [uid integer?]) undefined]
+              @defproc[(set-gid [uid integer?]) unspecific]
               @defproc[(user-effective-gid) integer]
-              @defproc[(set-user-effective-gid [gid integer?]) undefined]
+              @defproc[(set-user-effective-gid [gid integer?]) unspecific]
               @defproc[(with-user-effective-gid* [gid integer?] [thunk (-> any)]) (values value/s of thunk)]
               @defform[(with-user-effective-gid  [gid integer?] body ...+)])]{
   Similar to above, except these procedures get and set the effective and real @emph{group} ids. 
