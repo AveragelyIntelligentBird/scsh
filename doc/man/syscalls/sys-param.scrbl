@@ -12,17 +12,17 @@ Returns the name of the host on which we are executing. This may be a local name
 The value returned is a @code{uname} record, which is defined as given below:
 @codeblock{
     (define-record-type 
-    ; ... ;
-    uname?
-    (os-name    uname:os-name)    ; OS name.
-    (node-name  uname:node-name)  ; Network node hostname.
-    (release    uname:release)    ; OS release name.
-    (version    uname:version)    ; OS version name.
-    (machine    uname:machine))   ; Machine hardware name.
+        ; ... ;
+        uname?
+        (os-name    uname:os-name)    ; OS name.
+        (node-name  uname:node-name)  ; Network node hostname.
+        (release    uname:release)    ; OS release name.
+        (version    uname:version)    ; OS version name.
+        (machine    uname:machine))   ; Machine hardware name.
 }
 
 The record is discriminated with the @as-index[@code{uname?}] predicate. Each of the fields 
-contains a string.Be aware that the node name does not necessarily correspond to the 
+contains a string. Be aware that the node name does not necessarily correspond to the 
 fully-qualified domain name.
 
 All of the field accessors for the @code{uname} record are exposed to the @code{scsh-user} 
