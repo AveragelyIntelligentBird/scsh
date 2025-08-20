@@ -127,11 +127,11 @@
     (set-fdport! fd port revealed)
     port))
 
-(define (remake-stdio-fdport fd s48-port input?)
+(define (remake-stdio-fdport fd s48-port)
   (let* ((stdio-channel (s48-port->channel s48-port))
-         (port (if input?
-                  (make-input-fdport  stdio-channel bufpol/block)
-                  (make-output-fdport stdio-channel bufpol/block))))
+         (port (cond ((= fd 0) (make-input-fdport  stdio-channel bufpol/block))
+                     ((= fd 1) (make-output-fdport stdio-channel bufpol/block))
+                     ((= fd 2) (make-output-fdport stdio-channel bufpol/none)))))
     (set-fdport! fd port 1) ; Setting port-revealed count to 1 from startup
     port))
 
@@ -179,6 +179,7 @@
 ;;; ---------------------
 
 ;;; Flushes all output fdports
+;; Does not block
 (define (flush-all-ports)
   (let ((thunks (output-fdport-forcers #f))) 
     (cond ((null? thunks)
@@ -208,8 +209,8 @@
        (thunk)))
     (placeholder-value placeholder)))
 
-;;; Bare-bones flush; used at system exit
-(define (flush-all-ports-no-threads)
+;;; Bare-bones blocking flush; used at system exit/fork
+(define (flush-all-ports-blocking)
   (let ((thunks (output-fdport-forcers #f))) 
     (for-each (lambda (thunk) (thunk)) thunks)))
 
@@ -221,9 +222,9 @@
   current-error-port)
 
 (define (initialize-fdport-i/o* thunk)
-  (let ((in  (remake-stdio-fdport 0 (current-input-port) #t))
-        (out (remake-stdio-fdport 1 (current-output-port) #f))
-        (err (remake-stdio-fdport 2 (current-error-port) #f)))
+  (let ((in  (remake-stdio-fdport 0 (current-input-port)))
+        (out (remake-stdio-fdport 1 (current-output-port)))
+        (err (remake-stdio-fdport 2 (current-error-port))))
     (initialize-i/o in out err thunk)))
 
 (define-simple-syntax (initialize-fdport-i/o body ...)

@@ -122,13 +122,13 @@ s48_ref_t scsh_fork(s48_call_t call)
 */
 
 /* Returns (r w) */
-s48_ref_t scheme_pipe(s48_call_t call)
+s48_ref_t scsh_pipe(s48_call_t call)
 {
   int fds[2];
   s48_ref_t sch_retval = s48_unspecific_2(call);
 
   if(pipe(fds) == -1)
-    s48_os_error_2(call, "scheme_pipe", errno, 0);
+    s48_os_error_2(call, "scsh_pipe", errno, 0);
   else {
     sch_retval = s48_cons_2(call, s48_enter_long_2(call, fds[0]),
                             s48_cons_2(call, s48_enter_long_2(call, fds[1]),
@@ -769,6 +769,16 @@ s48_ref_t fcntl_write(s48_call_t call, s48_ref_t fd,
   return s48_enter_long_2(call, ret);
 }
 
+/* Sleep until time hisecs/losecs (return #t),
+** or until interrupted (return #f).
+**
+** We make you pass in an absolute time so that if you have to loop
+** making multiple tries to sleep due to interrupts, you don't get
+** drift.
+**
+** Posix sleep() is not too well defined. This one uses select(),
+** and is pretty straightforward.
+*/
 s48_ref_t sleep_until(s48_call_t call, s48_ref_t scm_when)
 {
     time_t now = time(0);
@@ -815,7 +825,7 @@ void s48_on_load(void) {
   S48_EXPORT_FUNCTION(scsh_lseek);
   S48_EXPORT_FUNCTION(char_ready_fdes);
   S48_EXPORT_FUNCTION(scsh_open);
-  S48_EXPORT_FUNCTION(scheme_pipe);
+  S48_EXPORT_FUNCTION(scsh_pipe);
   S48_EXPORT_FUNCTION(scsh_kill);
   S48_EXPORT_FUNCTION(scm_envvec);
   S48_EXPORT_FUNCTION(create_env);

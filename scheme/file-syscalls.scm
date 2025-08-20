@@ -1,5 +1,9 @@
 (import-lambda-definition-2 %set-cloexec (fd val) "set_cloexec")
 
+(import-lambda-definition-2 %fcntl-read (fd command) "fcntl_read")
+
+(import-lambda-definition-2 %fcntl-write (fd command val) "fcntl_write")
+
 (import-lambda-definition-2 %close-fdes (fd) "scsh_close")
 
 (import-lambda-definition-2 %dup (fd) "scsh_dup")
@@ -14,7 +18,7 @@
 
 (define/vector-args %open %open-raw (path) flags mode)
 
-(import-lambda-definition-2 %pipe-fdes () "scheme_pipe")
+(import-lambda-definition-2 %pipe-fdes () "scsh_pipe")
 
 (import-lambda-definition-2 %truncate-file-raw (path length) "scsh_truncate")
 

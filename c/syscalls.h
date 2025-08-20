@@ -2,7 +2,8 @@
 
 s48_ref_t wait_pid(s48_call_t call, s48_ref_t pid, s48_ref_t flags);
 
-s48_ref_t scheme_exec(s48_call_t call, s48_ref_t prog, s48_ref_t argv, s48_ref_t env);
+// No need for our own because s48 does what we need
+// s48_ref_t scsh_exec(s48_call_t call, s48_ref_t program, s48_ref_t argv, s48_ref_t env);
 
 s48_ref_t scsh_exit (s48_call_t call, s48_ref_t status);
 
@@ -10,7 +11,7 @@ s48_ref_t scsh__exit (s48_call_t call, s48_ref_t status);
 
 s48_ref_t scsh_fork (s48_call_t call);
 
-s48_ref_t scheme_pipe(s48_call_t call);
+s48_ref_t scsh_pipe(s48_call_t call);
 
 s48_ref_t scsh_kill (s48_call_t call, s48_ref_t pid, s48_ref_t signal);
 

@@ -157,7 +157,7 @@ On output ports, the data is delivered immediately after every write operation. 
 unbuffered input means gets a bit tricky, but scsh understands it to mean that @emph{no unrequested
 reading takes place}. Byte-oriented I/O happens directly, since we always know exactly how many 
 bytes are requested. For character-based I/O, the internal buffer is filled one byte at a time 
-until a character can be decoded. 
+until a character can be decoded. This gets really expensive, so use only if absolutely necessary.
 
 It can be useful to turn I/O buffering off in some cases, for example when an I/O stream is to be 
 shared by multiple subprocesses. For this reason, scsh allocates an unbuffered port for file 
@@ -181,9 +181,14 @@ buffered input on stdin can reset @code{(current-input-port)} to block buffering
   to an input port. It raises a write-error exception on error. Returns no value.
 }
 
-@defproc[(flush-all-ports) boolean]{
-  This procedure flushes all open output ports. The return value is true if at least one port has been
-  flushed; false otherwise.
+@deftogether[(@defproc[(flush-all-ports) boolean]
+              @defproc[(flush-all-ports-blocking) boolean])]{
+  This procedure flush all open output ports. The return value is true if at least one port has been
+  flushed; false otherwise. 
+  
+  @code{flush-all-ports} is a non-blocking, multi-threaded version. This is a sane default for most 
+  cases. @code{flush-all-ports-blocking} flushes ports iteratively, blocking until all is done. Useful
+  for pre-exit cleanups.  
 }
 
 @section{String Ports}

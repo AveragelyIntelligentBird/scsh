@@ -57,11 +57,13 @@
 
     max-soft-bufsize
     reset-fdport-for-bufpol
+    reset-fdport-channel/fd
   
     output-fdport-forcers))
 
 (define-interface scsh-fdports-interface
   (export 
+    reset-fdport-channel/fd
     set-port-buffering
     call/fdes
 	  sleazy-call/fdes
@@ -84,7 +86,7 @@
 	  error-output-port
 	  close
 	  release-port-handle
-	  flush-all-ports-no-threads
+	  flush-all-ports-blocking
 	  release-port-handle
 	  seek/end
 	  port-revealed
@@ -154,7 +156,7 @@
           seek/end
 
           flush-all-ports
-          flush-all-ports-no-threads          
+          flush-all-ports-blocking          
           set-port-buffering
           
           ; read
@@ -199,6 +201,7 @@
           ;; set-error-output-port!
 
           stdports->stdio
+          stdio->stdports
           with-stdio-ports*
           (with-stdio-ports :syntax)
 
@@ -329,7 +332,19 @@
           *temp-file-template*))
 
 (define-interface scsh-process-objects-interface
-  (export proc?
+  (export process-id?
+          process-id=?
+
+          process-id->integer
+          integer->process-id
+
+          process-id-exit-status
+          process-id-terminating-signal
+          
+          wait-for-child-process
+
+
+          proc?
           proc:pid
           pid->proc
           ;; autoreap-policy
@@ -354,21 +369,25 @@
           exec-path-search
           exit
           %exit
-          suspend
           fork
           %fork
-          process-sleep
-          process-sleep-until
           call-terminally
-          halts?
           fork/pipe
           %fork/pipe
           fork/pipe+
           %fork/pipe+
-          tail-pipe
-          tail-pipe+
+
+          suspend
+          process-sleep
+          process-sleep-until
+
+          ;; Not in docs, will hide for now
+          ; halts?
+          ; tail-pipe
+          ; tail-pipe+
+
           exec-path-list
-          init-exec-path-list)) ; ### should be internal
+          init-exec-path-list)) ; TODO should be internal
 
 (define-interface scsh-process-state-interface
   (export with-resources-aligned
@@ -446,9 +465,28 @@
           argv))
 
 (define-interface scsh-signals-interface
-  (export (signal :syntax)
-          signal-process
-          signal-process-group))
+  (export 
+    ; Named and Anonymous signals (from s48) 
+    (signal :syntax)
+    name->signal
+    integer->signal
+    signal?
+    signal?
+    signal-os-number
+    signal=?
+
+    ; Sending signals 
+    signal-process
+    signal-process-group
+  
+    ; Receiving signals with signal queues (from s48)
+    make-signal-queue
+    signal-queue?
+    signal-queue-monitored-signals
+    dequeue-signal!
+    maybe-dequeue-signal!
+    add-signal-queue-signal!
+    remove-signal-queue-signal!))
 
 (define-interface scsh-environment-interface
   (export setenv
@@ -565,6 +603,7 @@
           let-thread-fluids
           set-thread-fluid!
           make-preserved-thread-fluid
+          get-thread-cell-env
           preserve-thread-fluids
           fork-thread
           spoon))
@@ -898,6 +937,7 @@
 
 (define-interface scsh-stdio-interface
   (export stdports->stdio
+          stdio->stdports
           with-stdio-ports*
           with-current-error-port
 	  with-current-output-port

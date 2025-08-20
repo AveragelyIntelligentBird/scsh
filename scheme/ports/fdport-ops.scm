@@ -13,7 +13,7 @@
          (buffer-size (if (null? maybe-buffer-size) 
                           max-soft-bufsize 
                           (car maybe-buffer-size)))
-         (bufpol (cond ((and input? (= 1 buffer-size)) bufpol/none)
+         (bufpol (cond ((and input? (<= 1 buffer-size)) bufpol/none)
                        ((and (not input?) (= 0 buffer-size)) bufpol/none)
                        (else bufpol))))               
     (cond 
@@ -154,8 +154,8 @@
 ; file descriptor TARGET, it will be shifted to another file descriptor.
 (define (move->fdes fd/port target)
   (check-arg fd/port? fd/port dup->fdes)
+  (evict-ports target)
   (cond ((and (integer? fd/port) (not (= fd/port target)))
-          (evict-ports target)
           (%dup2 fd/port target)
           (close-fdes fd/port))
         ((fdport? fd/port)
@@ -231,18 +231,13 @@
 (define (move-fdport! fdport . maybe-target)
   (call-with-current-continuation
     (lambda (ret)
-      ; s48's dup mutates fdport's channel and returns a new port opened on the old fd
-      ; This allows us to keep the original fdport + plays nice with the VM
       (let* ((old-fd (fdport->fd fdport))
-             (target (if (pair? maybe-target) (car maybe-target) #f))
-             (revealed-count (if target 0 1))
-             ; Because of s48's bug(?) we can run dup directly on channels instead of s48 ports
-             (raw-channel (fdport->channel fdport)))
+             (target (:optional maybe-target #f))
+             (revealed-count (if target 1 0)))
         (if (eq? old-fd target) (ret))
-        (if target
-            ; We immediately close the  new s48 port returned by s48's dups
-            (close (s48-dup2 raw-channel target))  
-            (close (s48-dup raw-channel)))
+        (if target ; reset-fdport-channel will close old channels
+            (reset-fdport-channel/fd fdport (%dup2 old-fd target))
+            (reset-fdport-channel/fd fdport (%dup old-fd)))
         (delete-fdport! old-fd)
         (set-fdport! (fdport->fd fdport) fdport revealed-count)))))  
 
@@ -304,11 +299,47 @@
 (define with-output-to-file
   (mumble-with-mumble-file open-output-file (lambda (thunk port) (call-with-current-output-port port thunk))))
 
-(import-lambda-definition-2 pipe-fdes () "scheme_pipe")
-
 (define (pipe)
   (apply (lambda (r-fd w-fd)
            (let ((r (make-input-fdport/fd  r-fd 0 "<read end of pipe>"))
                  (w (make-output-fdport/fd w-fd 0 "<write end of pipe>")))
              (values r w)))
-         (pipe-fdes)))
+         (%pipe-fdes)))
+
+; TBD: generic fcntl()'s F_GETFD and F_SETFD AND a shorthand for just close-on-exec?
+; (fdes-flags fd/port)     --->     integer         (procedure) 
+; (set-fdes-flags fd/port integer)     --->     undefined         (procedure) 
+
+;;; Straight CALL/FDES modifies unrevealed file
+;;; descriptors by clearing their CLOEXEC bit when it reveals them -- so it
+;;; would interfere with the reading and writing of that bit!
+
+
+;;; Some of fcntl()
+;;;;;;;;;;;;;;;;;;;
+
+;;; fcntl()'s F_GETFD and F_SETFD.  Note that the SLEAZY- prefix on the
+;;; CALL/FDES isn't an optimisation; it's *required* for the correct behaviour
+;;; of these procedures. Straight CALL/FDES modifies unrevealed file
+;;; descriptors by clearing their CLOEXEC bit when it reveals them -- so it
+;;; would interfere with the reading and writing of that bit!
+
+; (define (fdes-flags fd/port)
+;   (sleazy-call/fdes fd/port
+;     (lambda (fd) (%fcntl-read fd fcntl/get-fdes-flags))))
+
+; (define (set-fdes-flags fd/port flags)
+;   (sleazy-call/fdes fd/port
+;     (lambda (fd) (%fcntl-write fd fcntl/set-fdes-flags flags))))
+
+; ;;; fcntl()'s F_GETFL and F_SETFL.
+; ;;; Get: Returns open flags + get-status flags (below)
+; ;;; Set: append, sync, async, nbio, nonblocking, no-delay
+
+; (define (fdes-status fd/port)
+;   (sleazy-call/fdes fd/port
+;     (lambda (fd) (%fcntl-read fd fcntl/get-status-flags))))
+
+; (define (set-fdes-status fd/port flags)
+;   (sleazy-call/fdes fd/port
+;     (lambda (fd) (%fcntl-write fd fcntl/set-status-flags flags))))

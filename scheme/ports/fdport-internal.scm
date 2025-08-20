@@ -14,7 +14,7 @@
   (really-make-channel-cell channel closer condvar bufpol soft-bufsize i/o-started? in-use?)
   (in-use? sent)
   channel-cell?
-  (channel channel-cell-ref)
+  (channel channel-cell-ref set-channel-cell-ref!)
   (closer  channel-cell-closer)
   (condvar channel-cell-condvar)
   (bufpol  channel-cell-bufpol  set-channel-cell-bufpol!)
@@ -81,6 +81,16 @@
 		(set-channel-cell-soft-bufsize! cell bufsize)
 		(set-port-index! port 0)
 		(set-port-limit! port (if input? 0 (channel-buffer-size)))))
+
+(define (reset-fdport-channel/fd port fd)
+	(let* ((cur-cell (port-data port))
+		     (old-channel (channel-cell-ref cur-cell))
+         (os-path (channel-id old-channel))
+		     (new-channel (if (input-port? port)
+							(open-channel fd os-path (enum channel-status-option input) #t)
+							(open-channel fd os-path (enum channel-status-option output) #t))))
+		(set-channel-cell-ref! cur-cell new-channel)
+    (close-channel old-channel)))
 
 (define (channel-buffer-size)
   (channel-parameter (enum channel-parameter-option buffer-size)))

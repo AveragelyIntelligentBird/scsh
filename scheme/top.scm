@@ -374,7 +374,7 @@
    (lambda ()
      (scheme-exit-now status))))
 
-(add-exit-hook! flush-all-ports-no-threads)
+(add-exit-hook! flush-all-ports-blocking)
 
 (define (bad-arg . msg)
   (with-current-output-port (current-error-port)
