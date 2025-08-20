@@ -456,7 +456,23 @@
   (open scheme
         (subset signals (error))
         (subset external-calls (import-lambda-definition-2))
-        (subset posix-processes (signal-os-number signal))
+        (subset posix-processes 
+          ; Exposing s48's entire signal interface
+          (signal
+          name->signal
+          integer->signal
+          signal?
+          signal?
+          signal-os-number
+          signal=?
+
+          make-signal-queue
+          signal-queue?
+          signal-queue-monitored-signals
+          dequeue-signal!
+          maybe-dequeue-signal!
+          add-signal-queue-signal!
+          remove-signal-queue-signal!))
         scsh-process-objects)
   (files signal))
 
@@ -488,13 +504,16 @@
         thread-fluids
         handle
         scsh-stdio
+        (subset os-strings (byte-vector->os-string os-string->string))
+        debug-messages		
         (subset signals (error warn))
         (subset srfi-13 (string-index))
-        (subset command-levels (session-started? set-batch-mode?!))
+        ; (subset command-levels (session-started? set-batch-mode?!))
+        (subset command-state (set-batch-mode?!))
         (subset scsh-utilities (mapv! stringify))
         (subset scsh-environment (alist->env-list getenv environ-resource))
         (subset external-calls (import-lambda-definition-2))
-        (subset posix-processes (signal exec-with-alias))
+        (subset posix-processes (signal exec-with-alias integer->process-id))
         (subset posix-time (current-time time-seconds))
         (subset interrupts (with-interrupts-inhibited))
         (subset display-conditions (display-condition))
@@ -506,7 +525,7 @@
         scsh-fdports
         exit-hooks
         scsh-signals)
-  (files process continuation))
+  (files process))
 
 (define-structure scsh-tty scsh-tty-interface
   (open (modify scheme (hide call-with-input-file

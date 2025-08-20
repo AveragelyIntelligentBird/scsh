@@ -4,6 +4,10 @@
   (align! resource-align!)
   (lock resource-lock))
 
+
+;; TODO: locks are considered outdated in scheme48, the preferred way to handle this is 
+;; with optimistic concurrency. We should probably update the internal representation
+;; to play nicer with scheme48
 (define (with-resources-aligned resources thunk)
    (let ((locks (map resource-lock resources)))
      (apply obtain-all-or-none locks)

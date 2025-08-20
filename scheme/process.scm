@@ -1,73 +1,90 @@
-;;; Process
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; we can't algin env here, because exec-path/env calls
-;; %%exec/errno directly  F*&% *P
+;;; Process controls ----------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Execs, exits, forks and forks with pipes for launching new processes
 
+;;; Execs ---------------------------------------------------------------------
+;; We rely on s48's exec-with-alias because it handles everything we need + 
+;; handles stopping and restarting alarm interrupts seamlessly
+
+;;; A low-level interface to exec() syscall that runs with resources aligned
+;; (%exec prog arglist env)
+;; * PROG is a string/symbol/number, is stringified
+;; * ARGLIST is a list of string/symbol/number, is stringified
+;; * ENV is either #f, meaning the current environment, or a string->string
+;;       alist.
 (define (%exec prog arg-list env)
-  (let ((arg-list (map stringify arg-list))
-        (env (if env (alist->env-list env) env)))
-    (exec-with-alias prog #f env arg-list)))
-
-
-(import-lambda-definition-2 exit/errno ; errno -- misnomer.
-  (status) "scsh_exit")
-
-(import-lambda-definition-2 %exit/errno ; errno -- misnomer
-  (status) "scsh__exit")
-
-(define (%exit . maybe-status)
-  (%exit/errno (:optional maybe-status 0))
-  (error "Yikes! %exit returned."))
-
-
-(import-lambda-definition-2 %%fork () "scsh_fork")
-
-;;; EXEC support
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Assumes a low-level %exec procedure:
-;;; (%exec prog arglist env)
-;;;   ENV is either #t, meaning the current environment, or a string->string
-;;;       alist.
-;;;   %EXEC stringifies PROG and the elements of ARGLIST.
-
-
-(define (exec-path-search prog path-list)
-  (cond
-   ((not (file-name-absolute? prog))
-    (let loop ((path-list path-list))
-      (if (not (null? path-list))
-          (let* ((dir (car path-list))
-                 (fname (string-append dir "/" prog)))
-            (if (file-executable? fname)
-                fname
-                (loop (cdr path-list)))))))
-   ((file-executable? prog)
-    prog)
-   (else #f)))
-
-(define (exec/env prog env . arglist)
-  (flush-all-ports)
   (with-resources-aligned
    (list environ-resource cwd-resource umask-resource euid-resource egid-resource)
    (lambda ()
-     (%exec prog (cons prog arglist) env))))
+     (let ((prog (stringify prog))
+           (arg-list (map stringify arg-list))
+           (env (if env (alist->env-list env) env)))
+    (exec-with-alias prog #f env arg-list)))))
 
+(define (exec/env prog env . arglist)
+  (flush-all-ports-blocking)
+  (%exec prog (cons prog arglist) env))
+
+(define (exec prog . arglist)
+  (apply exec/env prog #f arglist))
+
+(define (exec-path/env prog env . arglist)
+  (flush-all-ports-blocking)
+  (if (string-index (stringify prog) #\/)
+
+    ;; Contains a slash -- no path search.
+    (%exec prog (cons prog arglist) env)
+
+    ;; Try each directory in PATH-LIST.
+    (with-resources-aligned
+      (list environ-resource cwd-resource umask-resource euid-resource egid-resource)
+      (lambda ()
+        (let* ((prog (stringify prog))
+               (arglist (map stringify (cons prog arglist)))
+               (env (if env (alist->env-list env) env)))
+          (for-each 
+            (lambda (dir)
+              (let ((binary (string-append dir "/" prog)))
+                (with-handler (lambda (c m) #f)
+                              (lambda () (exec-with-alias binary #f env arglist)))))
+            (thread-fluid exec-path-list)))
+        (error "No executable found." prog arglist)))
+    ))
+
+(define (exec-path prog . arglist)
+  (apply exec-path/env prog #f arglist))
+
+;;; Searches the pathlist for an executable prog
+;;  Returns string on success, #f on failure
+(define (exec-path-search prog path-list)
+  (let ((prog (stringify prog)))
+    (cond ((not (file-name-absolute? prog))
+            (let loop ((path-list path-list))
+              (if (not (null? path-list))
+                  (let* ((dir (car path-list))
+                         (fname (string-append dir "/" prog)))
+                    (if (file-executable? fname)
+                        fname
+                        (loop (cdr path-list))))
+                  #f)))
+          ((file-executable? prog)
+            prog)
+          (else #f))))
+
+;;; Thread fluid, that captures exec $PATH at startup
 (define exec-path-list)
-
 (define (init-exec-path-list)
   (set! exec-path-list
         (make-preserved-thread-fluid
          (cond ((getenv "PATH") => split-colon-list)
                (else (warn "Starting up with no path ($PATH).") '())))))
 
-;;; We keep SPLIT-COLON-LIST defined
-;;; internally so the top-level startup code (INIT-SCSH) can use it
-;;; to split up $PATH without requiring the field-splitter or regexp code.
-
+;; We keep SPLIT-COLON-LIST defined
+;; internally so the top-level startup code (INIT-SCSH) can use it
+;; to split up $PATH without requiring the field-splitter or regexp code.
 (define (split-colon-list clist)
   (let ((len (string-length clist)))
     (if (= 0 len) '()                   ; Special case "" -> ().
-
         ;; Main loop.
         (let split ((i 0))
           (cond ((string-index clist #\: i) =>
@@ -76,100 +93,15 @@
                          (split (+ colon 1)))))
                 (else (list (substring clist i len))))))))
 
-;(define (exec-path/env prog env . arglist)
-;  (cond ((exec-path-search (stringify prog) (fluid exec-path-list)) =>
-;        (lambda (binary)
-;          (apply exec/env binary env arglist)))
-;       (else (error "No executable found." prog arglist))))
+;;; Exits  --------------------------------------------------------------------
 
-(define (exec-path/env prog env . arglist)
-  (flush-all-ports)
-  (with-resources-aligned
-   (list environ-resource cwd-resource umask-resource euid-resource egid-resource)
-   (lambda ()
-     (let ((prog (stringify prog)))
-       (if (string-index prog #\/)
+(import-lambda-definition-2 exit/status (status) "scsh_exit")
 
-           ;; Contains a slash -- no path search.
-           (%exec prog (cons prog arglist) env)
+(import-lambda-definition-2 %exit/status (status) "scsh__exit")
 
-           ;; Try each directory in PATH-LIST.
-           (let ((arglist (cons prog (map stringify arglist))))
-             (for-each (lambda (dir)
-                         (let ((binary (string-append dir "/" prog)))
-                           (with-handler (lambda (c m) #f)
-                                         (lambda () (exec-with-alias binary #f env arglist)))))
-                       (thread-fluid exec-path-list)))))
-     (error "No executable found." prog arglist))))
-
-(define (exec-path prog . arglist)
-  (apply exec-path/env prog #f arglist))
-
-(define (exec prog . arglist)
-  (apply exec/env prog #f arglist))
-
-
-;;; Assumes niladic primitive %%FORK.
-
-(define (fork . stuff)
-  (apply fork-1 #t stuff))
-
-(define (%fork . stuff)
-  (apply fork-1 #f stuff))
-
-(define (fork-1 clear-interactive? . rest)
-  (let-optionals rest ((maybe-thunk #f)
-                       (dont-narrow? #f))
-    (really-fork clear-interactive?
-                 maybe-thunk)))
-
-(define (preserve-ports thunk)
-  (let ((current-input (current-input-port))
-        (current-output (current-output-port))
-        (current-error (current-error-port)))
-    (lambda ()
-      (with-current-input-port*
-       current-input
-       (lambda ()
-         (with-current-output-port*
-          current-output
-          (lambda ()
-            (with-current-error-port*
-             current-error
-             thunk))))))))
-
-(define (really-fork clear-interactive? maybe-thunk)
-  (let ((proc #f))
-    (if clear-interactive?
-        (flush-all-ports))
-
-    ;; There was an atomicity problem/race condition -- if a child
-    ;; process died after it was forked, but before the scsh fork
-    ;; procedure could register the child's procobj in the
-    ;; pid/procobj table, then when the SIGCHLD signal-handler reaped
-    ;; the process, there would be no procobj for it.  We now lock
-    ;; out interrupts across the %%FORK and NEW-CHILD-PROC
-    ;; operations.
-
-    ((with-interrupts-inhibited
-      (lambda ()
-        ;; with-env-aligned is not neccessary here but it will
-        ;; create the environ object in the parent process which
-        ;; could reuse it on further forks
-        (let ((pid (with-resources-aligned
-                    (list environ-resource)
-                    %%fork)))
-          (if (zero? pid)
-              ;; Child
-              (lambda ()    ; Do all this outside the WITH-INTERRUPTS.
-                (if maybe-thunk
-                    (call-terminally maybe-thunk)))
-              ;; Parent
-              (begin
-                (set! proc (new-child-proc pid))
-                (lambda ()
-                  (values))))))))
-    proc))
+(define (%exit . maybe-status)
+  (%exit/status (:optional maybe-status 0))
+  (error "Yikes! %exit returned."))
 
 (define (exit . maybe-status)
   (let ((status (:optional  maybe-status 0)))
@@ -177,61 +109,121 @@
         (error "non-integer argument to exit"))
     (call-exit-hooks-and-run
      (lambda ()
-       (exit/errno status)
+       (exit/status status)
        (display "The evil undead walk the earth." 2)
        (if #t (error "(exit) returned."))))))
 
-;;; Like FORK, but the parent and child communicate via a pipe connecting
-;;; the parent's stdin to the child's stdout. This function side-effects
-;;; the parent by changing his stdin.
+;;; Call THUNK, then die.
+;;  A clever definition in a clever implementation allows the caller's stack
+;;  and dynamic env to be gc'd away, since this procedure never returns.
+(define (call-terminally thunk)  ; TODO: consider using ,go ?
+  (with-continuation
+   null-continuation
+   (lambda ()
+     (with-handler
+      (lambda (c more)
+        (display-condition c (current-error-port))
+        (exit 1))
+      (lambda ()
+        (dynamic-wind
+            (lambda () (values))
+            thunk
+            (lambda () (exit 0))))))))
 
-(define (fork/pipe . stuff)
-  (really-fork/pipe fork stuff))
+;; from shift-reset.scm:
+(define null-continuation #f)
 
-(define (%fork/pipe . stuff)
-  (really-fork/pipe %fork stuff))
+;;; Forks  --------------------------------------------------------------------
+
+(import-lambda-definition-2 %%fork () "scsh_fork")
+
+(define (fork . maybe-thunk)
+  (really-fork #t (:optional maybe-thunk #f)))
+
+(define (%fork . maybe-thunk)
+  (really-fork #f (:optional maybe-thunk #f)))
+
+(define (really-fork cleanup? thunk/false)
+  (if cleanup?
+      (flush-all-ports-blocking))
+  (let ((proc #f))
+    ;; There was an atomicity problem/race condition -- if a child
+    ;; process died after it was forked, but before the scsh fork
+    ;; procedure could register the child's procobj in the
+    ;; pid/procobj table, then when the SIGCHLD signal-handler reaped
+    ;; the process, there would be no procobj for it.  We now inhibit
+    ;; our interrupts across the %%FORK and NEW-CHILD-PROC
+    ;; operations.
+    (with-interrupts-inhibited 
+      (lambda ()
+        ;; with-env-aligned is not neccessary here but it will
+        ;; create the environ object in the parent process which
+        ;; could reuse it on further forks
+        (let ((pid (with-resources-aligned (list environ-resource)
+                      %%fork)))
+          (if (zero? pid)
+              ;; Child
+              (begin
+                ; Children are non-interactive.
+                (if cleanup? (set-batch-mode?! #t)) 
+                ; If thunk is given, call-terminally with interrupts *still* inhibited to ensure other
+                ; threads don't get in the way
+                ; NOTE: For some reason, s48 seems to *not* actually inhibit the delivery of OS signals 
+                ; to signal queues when run with with-interrupts-inhibited. This is a good thing for us 
+                ; (we can fork off thunks that block on dequeue-signal!), but it's probably a s48 bug.
+                (if thunk/false 
+                    (call-terminally thunk/false)))
+              ;; Parent, using s48's procobj
+              (set! proc (integer->process-id pid))))))
+    proc))
+
+;;; Like FORK, but the parent and child communicate via a pipe
+;; The pipe connects the parent's stdin to the child's stdout. 
+;; This function side-effects the parent by changing its stdin. 
+
+(define (fork/pipe . maybe-thunk)
+  (really-fork/pipe fork (:optional maybe-thunk #f)))
+
+(define (%fork/pipe . maybe-thunk)
+  (really-fork/pipe %fork (:optional maybe-thunk #f)))
 
 ;;; Common code for FORK/PIPE and %FORK/PIPE.
-(define (really-fork/pipe forker rest)
-  (let-optionals rest ((maybe-thunk #f)
-                       (no-new-command-level? #f))
-    (receive (r w) (pipe)
-      (let ((proc (forker #f no-new-command-level?)))
-        (cond (proc             ; Parent
-               (close w)
-               (move->fdes r 0))
-              (else             ; Child
-               (close r)
-               (move->fdes w 1)
-               (if maybe-thunk
-                   (with-current-output-port
-                    w
-                    (call-terminally maybe-thunk)))))
-        proc))))
-
+(define (really-fork/pipe forker thunk/false)
+  (receive (r w) (pipe)
+    (let* ((proc (forker #f)))
+      (cond (proc                             ; Parent
+              (close w)
+              (move->fdes r 0))
+            (else                             ; Child
+              (with-interrupts-inhibited  
+                (lambda ()
+                  (close r)
+                  (move->fdes w 1)
+                  (if thunk/false
+                      (with-current-output-port
+                        w
+                        (call-terminally thunk/false)))))))
+      proc)))
 
 ;;; FORK/PIPE with a connection list.
-;;; (FORK/PIPE . m-t) = (apply fork/pipe+ '((1 0)) m-t)
+;; (FORK/PIPE . m-t) = (apply fork/pipe+ '((1 0)) m-t)
+(define (fork/pipe+ conns . maybe-thunk)
+  (really-fork/pipe+ fork conns (:optional maybe-thunk #f)))
 
-(define (%fork/pipe+ conns . stuff)
-  (really-fork/pipe+ %fork conns stuff))
-
-(define (fork/pipe+ conns . stuff)
-  (really-fork/pipe+ fork conns stuff))
+(define (%fork/pipe+ conns . maybe-thunk)
+  (really-fork/pipe+ %fork conns (:optional maybe-thunk #f)))
 
 ;;; Common code.
-(define (really-fork/pipe+ forker conns rest)
-  (let-optionals rest ((maybe-thunk #f)
-                       (no-new-command-level? #f))
-    (let* ((pipes (map (lambda (conn) (call-with-values pipe cons))
-                       conns))
-           (rev-conns (map reverse conns))
-           (froms (map (lambda (conn) (reverse (cdr conn)))
-                       rev-conns))
-           (tos (map car rev-conns)))
+(define (really-fork/pipe+ forker conns thunk/false)
+  (let* ((pipes (map (lambda (conn) (call-with-values pipe cons))
+                      conns))
+         (rev-conns (map reverse conns))
+         (froms (map (lambda (conn) (reverse (cdr conn)))
+                    rev-conns))
+         (tos (map car rev-conns)))
 
-      (let ((proc (forker #f no-new-command-level?)))
-        (cond (proc                     ; Parent
+      (let ((proc (forker #f)))
+        (cond (proc                          ; Parent
                (for-each (lambda (to r/w)
                            (let ((w (cdr r/w))
                                  (r (car r/w)))
@@ -239,17 +231,39 @@
                              (move->fdes r to)))
                          tos pipes))
 
-              (else                     ; Child
-               (for-each (lambda (from r/w)
-                           (let ((r (car r/w))
-                                 (w (cdr r/w)))
-                             (close r)
-                             (for-each (lambda (fd) (dup w fd)) from)
-                             (close w))) ; Unrevealed ports win.
-                         froms pipes)
-               (if maybe-thunk
-                   (call-terminally maybe-thunk))))
-        proc))))
+              (else                         ; Child
+                (with-interrupts-inhibited  
+                  (lambda ()
+                    (for-each (lambda (from r/w)
+                                (let ((r (car r/w))
+                                      (w (cdr r/w)))
+                                  (close r)
+                                  (for-each (lambda (fd) (dup w fd)) from)
+                                  (close w))) ; Unrevealed ports win.
+                              froms pipes)
+                    (if thunk/false
+                        (call-terminally thunk/false))))))
+        proc)))
+
+;;; Miscellaneous process ops -------------------------------------------------
+;; Suspend and process-sleep variants
+
+(define (suspend) (signal-process 0 (signal stop)))
+
+(define (process-sleep secs) 
+  (process-sleep-until (+ secs (time-seconds (current-time)))))
+
+(define (process-sleep-until when)
+  (let* ((when (floor when))    ; Painful to do real->int in Scheme.
+         (when (if (exact? when) when (inexact->exact when))))
+    (let lp ()
+      (or (%sleep-until when) (lp)))))
+
+(import-lambda-definition-2 %sleep-until (secs) "sleep_until")
+
+;;; Old code stash ------------------------------------------------------------
+;; These procedures are not described in the manual, but could be added into 
+;; the spec with minimal trouble. Requires testing though.
 
 (define (tail-pipe a b)
   (fork/pipe a)
@@ -284,20 +298,3 @@
 ;;; The classic T 2.0 primitive.
 ;;; This definition works for procedures running on top of Unix systems.
 (define (halts? proc) #t)
-
-; SIGTSTP blows s48 away. ???
-(define (suspend) (signal-process 0 (signal stop)))
-
-;;; Miscellaneous
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; sleep(3):  Try to sleep for SECS seconds.
-
-(define (process-sleep secs) (process-sleep-until (+ secs (time-seconds (current-time)))))
-
-(define (process-sleep-until when)
-  (let* ((when (floor when))    ; Painful to do real->int in Scheme.
-         (when (if (exact? when) when (inexact->exact when))))
-    (let lp ()
-      (or (%sleep-until when) (lp)))))
-
-(import-lambda-definition-2 %sleep-until (secs) "sleep_until")

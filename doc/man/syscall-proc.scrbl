@@ -2,53 +2,68 @@
 
 @title{Processes}
 
-@deftogether[(@defproc[(exec      [program string?] [arg string?] ...) unspecific]
-              @defproc[(exec-path [program string?] [arg string?] ...) any]
-              @defproc[(exec/env  [program string?] 
-                                  [env (or/c (listof (cons/c string? string?)) #t)] 
-                                  [arg string?] ...) any]
-              @defproc[(exec-path/env [program string?] [environment (or/c (listof (cons/c string? string?)) #t)] [arg string?] ...) any])]{
-The @code{.../env} variants take an environment specified as a string to string alist. An
-environment of @code{#t} is taken to mean the current process' environment (i.e., the value of the
-external char @code{**environ}).
+@deftogether[(@defproc[(exec      [program (or symbol? string?)] 
+                                  [arg string?] ...) (values <no values returned>)]
+              @defproc[(exec-path [program (or symbol? string?)]
+                                  [arg string?] ...) (values <no values returned>)]
+              @defproc[(exec/env  [program [program (or symbol? string?)]] 
+                                  [env (or (alist string->string) #f)] 
+                                  [arg string?] ...) (values <no values returned>)]
+              @defproc[(exec-path/env [program [program (or symbol? string?)]] 
+                                  [env (or (alist string->string) #f)] 
+                                  [arg string?] ...) (values <no values returned>)])]{
+  This is the scsh interface for @code{exec()}.
 
-[Rationale: @code{#f} is a more convenient marker for the current environment than @code{#t}, but
-would cause an ambiguity on Schemes that identify @code{#f} and @code{()}.]
+  @margin-note{
+  Used to be @code{#t} as a marker. @code{#f} is a more convenient marker for the current environment 
+  than @code{#t}, but would cause an ambiguity on Schemes that identify @code{#f} and @code{()}.
+  }
 
-The path-searching variants search the directories in the list @code{exec-path-list} for the
-program. A path-search is not performed if the program name contains a slash character---it is used
-directly. So a program with a name like @code{"bin/prog"} always executes the program
-@code{bin/prog} in the current working directory. See @code{$path} and @code{exec-path-list}, below.
+  The @code{.../env} variants take an environment @var{env} specified as a string to string alist. An
+  environment @var{env} of @code{#f} is taken to mean the current process' environment 
+  (i.e., the value of the external @code{char **environ}).
 
-Note that there is no analog to the C function @code{execv()}. To get the effect just do
+  The path-searching variants search the directories in the list @code{exec-path-list} for the
+  program. A path-search is not performed if the program name contains a slash character---it is used
+  directly. So a program with a name like @code{"bin/prog"} always executes the program
+  @code{bin/prog} in the current working directory. See more details about @code{$path} and 
+  @code{exec-path-list} @seclink["path-list-sect"]{here}.
 
-@codeblock{(apply exec prog arglist)}
+  Note that there is no analog to the C function @code{execv()}. To get the effect just do
+  @codeblock{(apply exec prog arglist)}
 
-All of these procedures flush buffered output and close unrevealed ports before executing the new
-binary. To avoid flushing buffered output, see @code{%exec} below.
+  All of these procedures flush buffered output and close unrevealed ports before executing the new
+  binary. To avoid flushing buffered output, see @code{%exec} below.
 
-Note that the C @code{exec()} procedure allows the zeroth element of the argument vector to be
-different from the file being executed, e.g.
+  Note that the C @code{exec()} procedure allows the zeroth element of the argument vector to be
+  different from the file being executed, e.g.
 
-@codeblock{char *argv[] = {"-", "-f", 0};
-           exec("/bin/csh", argv, envp);}
+  @codeblock{
+  char *argv[] = {"-", "-f", 0};
+  exec("/bin/csh", argv, envp);
+  }
 
-The scsh @code{exec}, @code{exec-path}, @code{exec/env}, and @code{exec-path/env} procedures do not
-give this functionality---element 0 of the arg vector is always identical to the @code{prog}
-argument. In the rare case the user wishes to differentiate these two items, he can use the
-low-level @code{%exec} and @code{exec-path-search} procedures.
+  The scsh @code{exec}, @code{exec-path}, @code{exec/env}, and @code{exec-path/env} procedures do not
+  give this functionality---element 0 of the arg vector is always identical to the @code{prog}
+  argument. In the rare case the user wishes to differentiate these two items, he can use the
+  low-level @code{%exec} and @code{exec-path-search} procedures.
 
-These procedures never return under any circumstances. As with any other system call, if there is an
-error, they raise an exception.
+  These procedures never return under any circumstances. As with any other system call, if there is an
+  error, they raise an exception.
 }
 
-@deftogether[(@defproc[(%exec [program string?] [arglist (listof string?)] [env (or/c #t (listof (pair/c string? string?)))]) any]
-              @defproc[(exec-path-search [fname string?] [pathlist (listof string?)]) (or/c string? #f)])]{
+@deftogether[(@defproc[(%exec [program (or symbol? string?)] 
+                              [arglist (listof (or symbol? string?))] 
+                              [env (or (alist string->string) #f)]) (values <no values returned>)]
+              @defproc[(exec-path-search [fname string?] 
+                                         [pathlist (listof string?)]) (or/c string? #f)])]{
 The @code{%exec} procedure is the low-level interface to the system call. The @var{arglist}
-parameter is a list of arguments; @var{env} is either a string to string alist or @code{#t}. The new
-program's @code{argv[0]} will be taken from @code{(car arglist)}, @emph{not} from @var{prog}. An
-environment of @code{#t} means the current process' environment. @code{%exec} does not flush
-buffered output (see @code{flush-all-ports}).
+parameter is a list of arguments; @var{env} is either a string to string alist or @code{#f}. 
+
+The new program's @code{argv[0]} will be taken from @code{(car arglist)}, @emph{not} from @var{prog}. 
+
+An environment of @code{#f} means the current process' environment. @code{%exec} does not flush
+buffered output.
 
 All exec procedures, including @code{%exec}, coerce the @var{prog} and @var{arg} values to strings
 using the usual conversion rules: numbers are converted to decimal numerals, and symbols converted
@@ -56,14 +71,15 @@ to their print-names.
 
 @code{exec-path-search} searches the directories of @var{pathlist} looking for an occurrence of
 file @code{fname}. If no executable file is found, it returns @code{#f}. If @var{fname} contains a
-slash character, the path search isshort-circuited, but the procedure still checks to ensure that
-the file exists and is executable---if not, it still returns @code{#f}. Users of this procedure
-should be aware that it invites a potential race condition: between checking the file with
-@code{exec-path-search} and executing it with @code{%exec}, the file's status might change. The only
-atomic way to do the search is to loop over the candidate file names, exec'ing each one and looping
-when the exec operation fails.
+slash character, the path search is short-circuited, but the procedure still checks to ensure that
+the file exists and is executable---if not, it still returns @code{#f}. 
 
-See @code{$path} and @code{exec-path-list}, below.
+Users of this procedure should be aware that it invites a potential race condition: between 
+checking the file with @code{exec-path-search} and executing it with @code{%exec}, the file's 
+status might change. The only atomic way to do the search is to loop over the candidate file names, 
+exec'ing each one and looping when the exec operation fails.
+
+See more details about @code{$path} and @code{exec-path-list} @seclink["path-list-sect"]{here}.
 }
 
 @deftogether[(@defproc[(exit [status integer? 0]) any]
@@ -73,7 +89,7 @@ These procedures terminate the current process with a given exit status. The def
 output.
 }
 
-@defproc[(call-terminally [thunk (-> (values any ...))]) any]{
+@defproc[(call-terminally [thunk (-> any)]) (values value/s of thunk)]{
 @code{call-terminally} calls its thunk. When the thunk returns, the process exits. Although
 @code{call-terminally} could be implemented as
 
@@ -85,30 +101,37 @@ bindings are discarded. This can allow the old stack and dynamic environment to 
 (assuming this data is not reachable through some live continuation).
 }
 
-@defproc[(suspend) unspecific]{
-Suspend the current process with a SIGSTOP signal.
+@deftogether[(@defproc[(fork  [thunk (or (-> any) #f) #f]) (values proc or #f)]
+              @defproc[(%fork [thunk (or (-> any) #f) #f]) (values proc or #f)])]{
+
+@margin-note{
+In previous releases there was an extra argument for independtently specifying whether the currently
+active threads continue to run in the child or not. This might be brought back in future releases. 
 }
 
-@deftogether[(@defproc[(fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc[(%fork [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@margin-note{
+Note that these forking procedures concern @emph{process} forking. Scsh also offers "thread forking", 
+which preserves thread-local fluids. For more details, see @secref["thread-local-sec"].
+}
+
 @code{fork} with no arguments or @code{#f} instead of a thunk is like C @code{fork()}. In the parent
-process, it returns the child's @emph{process object} (see below for more information on process
-objects). In the child process, it returns @code{#f}.
+process, it returns the child's @emph{process object} (see @seclink["proc-obj-sec"]{below} for more 
+information on process objects). In the child process, it returns @code{#f}. Note that the forked 
+child process contains all the treads of the parent process.
 
-@code{fork} with an argument only returns in the parent process, returning the child's process
-object. The child process calls @var{thunk} and then exits.
+@code{fork} with an argument @var{thunk} can be throught of as "forking off just the given thunk". 
+In the parent process, the procedure similarly returns the child's process object. In the child 
+process, however, it immediately calls @var{thunk} with @code{call-terminally} and then exits. 
+To ensure that nothing but the thunk executes, we disable the thread system in the child process.
 
-@code{fork} flushes buffered output before forking, and sets the child process to non-interactive.
-@code{%fork} does not perform this bookkeeping; it simply forks.
-
-The optional boolean argument @var{continue-threads?} specifies whether the currently active threads
-continue to run in the child or not. The default is @code{#f}.
+@code{fork} flushes buffered output before forking, and sets the child process to non-interactive mode
+(known as "batch mode" in scheme48). @code{%fork} does not perform any bookkeeping; it simply forks.
 }
 
-@deftogether[(@defproc[(fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc[(%fork/pipe [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@deftogether[(@defproc[(fork/pipe  [thunk (or (-> any) #f) #f]) (values proc or #f)]
+              @defproc[(%fork/pipe [thunk (or (-> any) #f) #f]) (values proc or #f)])]{
 Like @code{fork} and @code{%fork}, but the parent and child communicate via a pipe connecting the
-parent's stdin to the child's stdout. These procedures side-effect the parent by changing his stdin.
+parent's stdin to the child's stdout. These procedures side-effect the parent by changing its stdin.
 
 In effect, @code{fork/pipe} splices a process into the data stream immediately upstream of the
 current process. This is the basic function for creating pipelines. Long pipelines are built by
@@ -138,28 +161,30 @@ rule: Scheme ports are bound to I/O sources and sinks, @emph{not} particular fil
 If the child process wishes to rebind the current output port to the pipe on file descriptor 1, it
 can do this using @code{with-current-output-port} or a related form. Similarly, if the parent wishes
 to change the current input port to the pipe on file descriptor 0, it can do this using
-@code{set-current-input-port!} or a related form. Here is an example showing how to set up the I/O
+@code{with-current-input-port} or a related form. Here is an example showing how to set up the I/O
 ports on both sides of the pipe:
 
-@codeblock{(fork/pipe (lambda ()
-                        (with-current-output-port (fdes->outport 1)
-                        (display "Hello, world.\\n"))))
-            (set-current-input-port! (fdes->inport 0))
-            (read-line)     ; Read the string output by the child.}
+@codeblock{
+  > (fork/pipe (lambda ()
+      (with-current-output-port (fdes->outport 1)
+        (display "Hello, world.\\n"))))
+  > (with-current-input-port (fdes->inport 0)
+      (read-line))  ; Read the string output by the child.
+}
 
 None of this is necessary when the I/O is performed by an exec'd program in the child or parent
 process, only when the pipe will be referenced by Scheme code through one of the default current I/O
 ports.
 }
 
-@deftogether[(@defproc[(fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)]
-              @defproc[(%fork/pipe+ [conns (listof integer?)] [thunk (or/c #f (-> (values any ...)))] [continue-threads? boolean? #f]) (or/c proc? #f)])]{
+@deftogether[(@defproc[(fork/pipe+  [conns (listof integer?)] [thunk (or (-> any) #f) #f]) (values proc or #f)]
+              @defproc[(%fork/pipe+ [conns (listof integer?)] [thunk (or (-> any) #f) #f]) (values proc or #f)])]{
 Like @code{fork/pipe}, but the pipe connections between the child and parent are specified by the
 connection list @var{conns}. See the
 
 @codeblock{("|+" conns pf1 ... pfn)}
 
-process form for a description of connection lists.
+process form for a description of connection lists @seclink["proc-forms-sec"]{here}.
 }
 
 @section[#:tag "proc-obj-sec"]{Process objects and process reaping}
@@ -360,4 +385,22 @@ So (zero? status) is a correct way to test for non-error, normal termination, e.
 
   If the child process terminated abnormally, @code{status:term-sig} returns the signal that 
   terminated the child. Otherwise, this function returns false.
+}
+
+@section{Miscellaneous}
+
+@defproc[(suspend) unspecific]{
+  Suspend all processes in the current process group with a @code{SIGSTOP} signal. Equivalent to 
+  @codeblock{(signal-process 0 (signal stop))}
+}
+
+@deftogether[(@defproc[(process-sleep       [secs integer]) boolean]
+              @defproc[(process-sleep-until [time integer]) boolean])]{
+  The @code{process-sleep} procedure causes the process to sleep for @var{secs} seconds. 
+  The @code{process-sleep-until} procedure causes the process to sleep until @var{time} (see 
+  @seclink["datetime-chap"]{here} for more details).
+
+  Note that these procedures suspend all running threads, including the ones Scsh uses for 
+  administrtive purposes. Consider using the @code{sleep} procedure to only put the current thread
+  to sleep. For more details, see @secref["threads-chapter"].
 }

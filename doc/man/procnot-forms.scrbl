@@ -1,7 +1,7 @@
 #lang scribble/doc
 @(require scribble/manual "def-with-nolink.rkt")
 
-@title{Process Forms}
+@title[#:tag "proc-forms-sec"]{Process Forms}
 A @emph{process form} specifies a computation to perform as an independent Unix process. It can be
 one of the following:
 
@@ -9,7 +9,8 @@ one of the following:
            (| pf-1 ... pf-n)                ; Simple pipeline
            (|+ connect-list pf-1 ... pf-n)  ; Complex pipeline
            (epf . epf)                      ; An extended process form.
-           (prog arg-1 ... arg-n)           ; Default: exec the program.}
+           (prog arg-1 ... arg-n)           ; Default: exec the program.
+           }
 
 The default case @code{(prog arg-1 ... arg-n)} is also implicitly backquoted. That is, it is
 equivalent to:

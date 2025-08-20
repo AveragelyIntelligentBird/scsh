@@ -63,7 +63,6 @@ test: enough
 SCHEME = scheme/command-line.scm \
 	 scheme/condition-handler.scm \
 	 scheme/constance.scm \
-	 scheme/continuation.scm \
 	 scheme/directory.scm \
 	 scheme/enumconst.scm \
 	 scheme/environment.scm \

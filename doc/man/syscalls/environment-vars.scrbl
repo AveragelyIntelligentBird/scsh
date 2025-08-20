@@ -138,7 +138,7 @@ parsed from their colon-separated form.
   with the original list. Both functions use @code{equal?} for comparing elements.
 }
 
-@section{$USER, $HOME, and $PATH}
+@section[#:tag "path-list-sect"]{$USER, $HOME, and $PATH}
 
 Like @code{sh} and unlike @code{csh}, scsh has no interactive dependencies on environment variables. 
 It does, however, initialise certain internal values at startup time from the initial process 
