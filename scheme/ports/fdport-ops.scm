@@ -1,4 +1,5 @@
-;;; Part of scsh 1.0. See file COPYING for notices and license.
+;;; fdports operations --------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; Contains high-level, user-facing fdport operations + syscalls
 
 ;;; Buffering policy setter

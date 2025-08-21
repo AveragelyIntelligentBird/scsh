@@ -1,6 +1,6 @@
-;;; Code for processing Unix file names.
-;;; Copyright (c) 1992 by Olin Shivers (shivers@lcs.mit.edu).
-;;; See file COPYING
+;;; Filename processing -------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Code for processing Unix file names.
 
 ;;; We adhere to Posix file name rules, plus we treat files beginning with
 ;;; ~ as absolute paths.

@@ -1,5 +1,5 @@
 ;;; String Format -------------------------------------------------------------
-;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; 
 ;; Quick string formatter, outputs directly to the specified port or returns
 ;; a new string. 

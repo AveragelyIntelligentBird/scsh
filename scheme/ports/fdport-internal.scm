@@ -1,4 +1,5 @@
-;;; Part of scsh 1.0. See file COPYING for notices and license.
+;;; Internals of fdports ------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; Contains scsh channel cell, fdport handler implementation and flushing control
 ;; This file largely reimplements s48's buffered ports with necessary extensions 
 ;; to support scsh operations, such as bufpol control. In an effort to keep scsh 

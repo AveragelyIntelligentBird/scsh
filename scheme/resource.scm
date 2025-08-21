@@ -1,3 +1,6 @@
+;;; Resources -----------------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+
 (define-record-type :resource
   (make-resource align! lock)
   resource?

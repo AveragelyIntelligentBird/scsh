@@ -1,8 +1,6 @@
-;;; Code for processing file names with a glob pattern.
-
-;;; Copyright (c) 1994 by David Albertz (dalbertz@clark.lcs.mit.edu).
-;;; Copyright (c) 1994 by Olin Shivers   (shivers@clark.lcs.mit.edu).
-;;; See file COPYING.
+;;; Globbing ------------------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Processing file names with a glob pattern.
 
 ;;; Usage:	(glob pattern-list)
 ;;;                 pattern-list := a list of glob-pattern strings

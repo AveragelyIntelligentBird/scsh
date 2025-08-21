@@ -1,3 +1,7 @@
+;;; Process state -------------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Resouce management interface for global process state and thread-local state 
+
 ;;; UMASK
 (define (process-umask)
   (let ((mask (set-file-creation-mask! (file-mode- (file-mode all) (file-mode all)))))

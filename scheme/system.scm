@@ -1,3 +1,6 @@
+;;; System & Uname Information ------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+
 (import-lambda-definition-2 %gethostname () "scm_gethostname")
 
 (define (system-name)

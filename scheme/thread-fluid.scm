@@ -1,4 +1,11 @@
-; Copyright (c) 1993-2001 by Richard Kelsey and Jonathan Rees. See file COPYING.
+;;; Thread fluids -------------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Thread-local state via thread fluids and preserved thread fluids. The 
+;; implementation is rather awkward at this time, since it attempts to exist on 
+;; top of s48. In future releases, it can be significantly optimized by closer
+;; integration with s48's thread system.
+;; -----------------------------------------------------------------------------
+
 ;;; This is based on code from the scsh 0.6 distribution. There was not much
 ;;; documentation behind the implementation or uses of thread-fluids, but
 ;;; I tried to make sure that this emulates the original behavior. Unfortunately,
@@ -74,7 +81,8 @@
 (define (make-thread-fluid top)
   (really-make-thread-fluid (make-thread-cell top)))
 
-(define *preserved-fluids* (make-population))
+;; TODO: Consider making this a command-level s48 fluid?
+(define *preserved-fluids* (make-population)) 
 
 (define (make-preserved-thread-fluid top)
   (let* ((t-fluid (make-thread-fluid top)))
@@ -104,7 +112,8 @@
   (make-thread-cell default)
   (default thread-cell-default))
 
-(define *thread-cell-envs* '())
+  ;; TODO: Consider making this a command-level s48 fluid?
+(define *thread-cell-envs* '()) 
 
 (define (get-thread-cell-env)
   (cond

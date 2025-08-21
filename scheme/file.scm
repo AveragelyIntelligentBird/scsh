@@ -1,5 +1,5 @@
-;;; File system
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; File operations -----------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
 
 ;;; Useful little utility for generic ops that work on filenames, fd's or
 ;;; ports.

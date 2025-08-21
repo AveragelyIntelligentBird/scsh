@@ -1,4 +1,5 @@
-;;; Part of scsh 1.0. See file COPYING for notices and license.
+;;; Core fdport interface -----------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; Contains general scsh fdport makers, port-reveal getter/setters, port flushing 
 ;; and stdio fdport system init.
 

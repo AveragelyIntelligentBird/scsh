@@ -1,4 +1,5 @@
-;;; Part of scsh 1.0. See file COPYING for notices and license.
+;;; Buffering Policy ----------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; Port buffering policy support for scsh fdports.
 
 ;;; Enum, represeting possile buffering policies

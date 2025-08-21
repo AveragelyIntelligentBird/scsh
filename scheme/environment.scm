@@ -1,3 +1,6 @@
+;;; Environment management ----------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+
 ;;; Environment manipulation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

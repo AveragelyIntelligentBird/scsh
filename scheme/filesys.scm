@@ -1,5 +1,8 @@
-;;; Ops that create objects in the file system:
-;;; create-{directory,fifo,hard-link,symlink}
+;;; Filesystem operations ------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Ops that create objects in the file system: create-{directory,fifo,hard-link,symlink}
+
+
 ;;; Copyright (c) 1993 by Olin Shivers.
 
 ;;; This procedure nukes FNAME, whatever it may be: directory, file, fifo,

@@ -1,3 +1,6 @@
+;;; Filename resolution -------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+
 ;;; User / Group dependent stuff
 
 (define (resolve-tilde-file-name fname)

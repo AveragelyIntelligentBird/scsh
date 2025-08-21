@@ -1,3 +1,6 @@
+;;; Port collectors -----------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+
 ;;; Read characters from PORT until EOF, collect into a string.
 
 (define (port->string port)
