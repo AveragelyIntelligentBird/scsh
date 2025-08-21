@@ -2,6 +2,18 @@
 
 @title{Process state}
 
+@margin-note{
+  Note that if you are in 
+  interactive mode and a setter operation fails, you will receive an exception. Scheme48 will raise 
+  you to a higher command level where you can presumably resolve the issue. However, since the setting
+  operation was interrupted, the resource remains locked, and any attempt to set it now will result in
+  a deadlock. 
+  
+  Use @code{,resume} command to get back to toplevel and try again. 
+}
+This section describes getters and setters for process resources. To avoid race conditions, these
+resources rely on a mutex mechanism to lock them during modification. 
+
 @deftogether[(@defproc[(umask) file-mode]
               @defproc[(set-umask   [perms (or file-mode? integer?)]) unspecific]
               @defproc[(with-umask* [perms (or file-mode? integer?)] [thunk (-> any)]) (values value/s of thunk)]
@@ -48,7 +60,7 @@
   It may be either an integer process id or a process object (see more @seclink["proc-obj-sec"]{here}).
 }
 
-@; TODO priority stuff?
+@; TODO perhaps add priority stuff?
 @; (set-priority which who priority)     --->     unspecific         (procedure) 
 @; (priority which who)     --->     fixnum         (procedure) 
 @; (nice [proc/pid delta])     --->     unspecific         (procedure) 

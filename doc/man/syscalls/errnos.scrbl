@@ -233,13 +233,11 @@ The syntax for @code{errno} and valid @var{named-error}s are as follows:
   for an @code{errno}'s number. 
 }
 
-@; TODO - should it be exposed? I think yes for 34, no for 35?
 @section[#:tag "s48-exceptions-sec"]{Scheme 48's Exception Handling}
 
-Scheme 48 implements 
+To represent and handle exceptions, Scheme 48 implements 
 @hyperlink["https://srfi.schemers.org/srfi-34/srfi-34.html"]{SRFI 34: Exception Handling for Programs}
-and @hyperlink["https://srfi.schemers.org/srfi-35/srfi-35.html"]{SRFI 35: Conditions}, 
-which is exposed to scsh users. 
+and @hyperlink["https://srfi.schemers.org/srfi-35/srfi-35.html"]{SRFI 35: Conditions}.
 
 The system reports syscall errors by raising exceptions with compound conditions. The scsh-specific
 condition type is @code{&os-error}, which has a field @code{code} that contains the system error number.

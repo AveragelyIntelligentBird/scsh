@@ -21,7 +21,7 @@ documentation purposes only - the shell does not enforce these types at runtime.
 @include-section["strings-and-chars.scrbl"]
 @; @include-section["pattern-match-rx.scrbl"]
 @include-section["delim-strings.scrbl"]
-@; @include-section["awk.scrbl"]
+@include-section["field-parse.scrbl"]
 @include-section["concurrent.scrbl"]
 @include-section["miscellaneous.scrbl"]
 @include-section["running-scsh.scrbl"]

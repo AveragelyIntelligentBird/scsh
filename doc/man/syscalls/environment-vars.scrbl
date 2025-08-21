@@ -111,8 +111,8 @@ directories to be searched), the common Unix convention is to separate the list 
 delimiters(...and hope the individual list elements don't contain colons themselves). 
 
 To convert between the colon-separated string encoding and the list-of-strings representation, 
-see the @code{infix-splitter} function <TODO LINK 8.1.2> and the string library's string-join function. 
-For example,
+see the @code{infix-splitter} function (see @seclink["field-parse-sec"]{here}) and the string 
+library's string-join function. For example,
 @codeblock{
   (define split (infix-splitter (rx ":")))
   (split "/sbin:/bin::/usr/bin")  

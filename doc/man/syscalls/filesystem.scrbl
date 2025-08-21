@@ -142,7 +142,6 @@ All of the field accessors for the @code{file-info} record are exposed to the @c
 top-level package. However, it might be more convenient to use the following bindings built on 
 top of @code{(file-info)}:
 
-@; TODO repalce the names with dash notation
 @deftogether[(@defproc[(file:type   [fname/fd/port (or string? integer? fdport?)] 
                                     [chase? boolean? #t])
                        (or 'block-special 'char-special 'directory 'fifo 'regular 'socket 'symlink)]
