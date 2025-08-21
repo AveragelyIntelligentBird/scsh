@@ -11,7 +11,7 @@ is discussed separately in @secref["networking-chapter"].
 @include-section["syscalls/errnos.scrbl"]
 @include-section["syscalls/io.scrbl"]
 @include-section["syscalls/filesystem.scrbl"]
-@include-section["syscall-proc.scrbl"]
+@include-section["syscalls/processes.scrbl"]
 @include-section["syscalls/proc-state.scrbl"]
 @include-section["syscalls/db-access.scrbl"]
 @include-section["syscalls/cli-args.scrbl"]
