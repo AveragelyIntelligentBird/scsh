@@ -7,3 +7,5 @@
 @section[#:tag "thread-local-sec"]{Thread-local fluids}
 <s48 fluids are local to a command level>
 <thread-fluids>
+
+@section[#:tag "deadlocks-sec"]{Deadlocks}

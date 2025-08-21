@@ -174,7 +174,7 @@
                 (if thunk/false 
                     (call-terminally thunk/false)))
               ;; Parent, using s48's procobj
-              (set! proc (integer->process-id pid))))))
+              (set! proc (new-child-proc pid))))))
     proc))
 
 ;;; Like FORK, but the parent and child communicate via a pipe

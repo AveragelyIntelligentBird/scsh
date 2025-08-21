@@ -1,7 +1,7 @@
 #lang scribble/doc
 @(require scribble/manual "def-with-nolink.rkt")
 
-@title{Signal system}
+@title[#:tag "signals-chapter"]{Signal system}
 
 There are two varieties of signals available, @italic{named} and @italic{anonymous}. A named signal is one for which we have a symbolic name, such as @code{kill} or @code{pipe}. A full list of named signals supported by scheme48 is given in @bold{3.9.5}.
 

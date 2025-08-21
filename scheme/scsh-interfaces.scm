@@ -332,33 +332,11 @@
           *temp-file-template*))
 
 (define-interface scsh-process-objects-interface
-  (export process-id?
-          process-id=?
-
-          process-id->integer
-          integer->process-id
-
-          process-id-exit-status
-          process-id-terminating-signal
-          
-          wait-for-child-process
-
-
-          proc?
+  (export proc?
           proc:pid
           pid->proc
-          ;; autoreap-policy
-          ;; with-autoreaping
-          reap-zombies
-          wait
-          wait-any
-          ;; wait-process-group
-          status:exit-val
-          status:stop-sig
-          status:term-sig
-          wait/poll
-          wait/stopped-children
-          new-child-proc))
+          new-child-proc
+          wait))
 
 (define-interface scsh-process-interface
   (export exec

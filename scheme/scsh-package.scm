@@ -86,15 +86,6 @@
         scheme)
   (files syntax-helpers))
 
-(define-structure waitcodes
-  (export wait/poll
-          wait/stopped-children
-          status:exit-val
-          status:stop-sig
-          status:term-sig)
-  (open scheme bitwise)
-  (files waitcodes))
-
 (define-structures ((tty-flags tty-flags-interface)
                     (scsh-internal-tty-flags scsh-internal-tty-flags-interface))
   (open scheme ascii bitwise constance (subset srfi-1 (fold)))
@@ -431,19 +422,20 @@
         tables
         weak-tables
         weak
-        waitcodes
         let-opt
         define-record-types
         (subset posix-processes (signal
-                                 process-id-exit-status
-                                 integer->process-id
-                                 wait-for-child-process
-                                 process-id-exit-status
-                                 process-id-terminating-signal))
+                                  process-id?
+                                  process-id=?
+                                  process-id->integer
+                                  integer->process-id
+                                  process-id-exit-status
+                                  process-id-terminating-signal
+                                  wait-for-child-process))
         (subset threads-internal (spawn-on-root))
         (subset primitives (add-finalizer!))
         (subset srfi-1 (delete filter))
-        (subset scsh-utilities (make-reinitializer
+        (subset scsh-utilities (check-arg make-reinitializer
                                 with-lock run-as-long-as))
         low-interrupt
         (subset external-calls (import-lambda-definition-2))
