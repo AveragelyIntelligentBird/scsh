@@ -311,21 +311,15 @@ flag with @code{set-file-status-flags!}.
   Also, note that if this is an output port, @code{non-blocking} flag will be applied automatically, 
   as described in the beginning of the section.
 
+@margin-note{
+  If you ever need a flag not defined in @code{file-flags}, you can always call @code{file-flags->integer}
+  to convert the set to its binary representation and then set the desired bit with @code{bitwise-ior}.
+  }
   @var{flags} is an enumerated set @code{file-flags} that represents file creation flags and 
   file status flags. See how to use @code{file-flags} in detail @seclink["file-flags-sec"]{here}.
   @var{flags} must contain exactly one access mode, i.e. @code{read-write}, @code{write-only} or
-  @code{read-only}. 
-
-  @margin-note{
-  If you ever need a flag not defined in @code{file-flags}, you can always call @code{file-flags->integer}
-  to convert the set to its binary representation and then @code{bitwise-ior} the desired bit.
-  }
-  For backwards compatibility, @var{flags} also accepts raw integers. To construct a valid @var{flags}
-  value, use @code{bitwise-ior} with legacy flag bindings: @code{open/append}, @code{open/non-blocking}
-  @code{open/async}, @code{open/fsync}, @code{open/read}, @code{open/write}, @code{open/read+write},
-  @code{open/create}, @code{open/exclusive}, @code{open/no-control-tty} and @code{open/truncate}. We
-  also provide @code{open/access-mask} for masking out the access mode.
-
+  @code{read-only}. @var{flags} also accepts raw flag fixnums for additional flexibility. 
+  
   @var{mode} is an integer or an enumerated set @code{file-mode} that specifies the file mode bits to 
   be applied when a new file is created. If @var{flags} does not contain @code{create} flag, the 
   @var{mode} will be ignored. The default value is @code{(file-mode read write)} or #o666. See how 
@@ -337,7 +331,7 @@ flag with @code{set-file-status-flags!}.
                                          [flags (or file-flags? integer?) (file-flags read-only)]) 
                                          fdport]
               @defproc[(open-output-file [pathname string?]
-                                         [flags (or file-flags? integer?) (file-options create truncate non-blocking)]
+                                         [flags (or file-flags? integer?) (file-flags create truncate non-blocking)]
                                          [mode file-mode? (file-mode read write)]) fdport])]{
   These are equivalent to @code{open-file}, after first including @code{read-only} or @code{write-only}
   flags, respectively. Also, note that if this is an output, @code{non-blocking} flag will be applied 

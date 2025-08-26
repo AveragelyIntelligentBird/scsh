@@ -1,11 +1,9 @@
 ;;; File Status Flags ---------------------------------------------------------
-;; Part of scsh 1.0. See file COPYING for notices and license.
+;; Part of scsh 0.7. See file COPYING for notices and license.
 ;; Describes enumerated set type for file status flags for open() and fcntl()
 ;; and defines legacy bindings. 
 
-;; TODO: file-flags?
- 
-(define-enumerated-type file-flag? :file-flag
+(define-enumerated-type file-flag :file-flag
   file-flag?				  ; Predicate
   the-file-flags		  ; Vector containing all elements
   file-flag-name			; Name accessor
@@ -28,20 +26,21 @@
                         ; the process's controlling terminal
     no-follow  ; Do not follow	symlinks
     truncate   ; Truncate size	to 0
-      tmp-file   ; NOT IN BSD, create an unnamed temporary regular file
-      path       ; NOT IN BSD, The file itself is not opened but you get an fd
-      large-file ; NOT IN BSD, allow files whose sizes cannot be represented in an
-                 ;  off_t (but can be represented in an off64_t) to be opened.
+    ; tmp-file   ; NOT IN BSD, create an unnamed temporary regular file
+    ; path       ; NOT IN BSD, The file itself is not opened but you get an fd
+    ; large-file ; NOT IN BSD, allow files whose sizes cannot be represented in an
+    ;            ;  off_t (but can be represented in an off64_t) to be opened.
       
     ;; File status flags, read and written by fcntl()
     append
     async
-    direct 
+    direct     ; TODO: Couldn't find it in apple-oss's fcntl.h, but that's like outdated + freeBSD has it
     data-sync  ; DSYNC, synchronized I/O *data* integrity completion.
-      no-access-time ; NOT IN BSD, do not update the file last access time
+    file-sync  ; FSYNC/SYNC, synchronized I/O *file* integrity completion
+               ; (incorrectly AKA RSYNC in Linux)
+    ; no-access-time ; NOT IN BSD, do not update the file last access time
     nonblocking
-    file-sync ; FSYNC/SYNC, synchronized I/O *file* integrity completion
-              ; (incorrectly AKA RSYNC in Linux)
+    
 ))
 
 (define-enum-set-type file-flags :file-flags
@@ -52,17 +51,7 @@
   the-file-flags
   file-flag-index)
 
-(define-exported-binding "posix-file-flags-enum-set-type" :file-flags)
-
-; TODO Add file-mode interface
-    ;   file-mode?
-	;   (file-mode :syntax)
-	;   file-mode+ file-mode-
-	;   file-mode=? file-mode<=? file-mode>=?
-	;   file-mode->integer integer->file-mode
-
-(define (flags-list flags)
-  (enum-set->list flags))
+(define-exported-binding "file-flags-enum-set-type" :file-flags)
 
 (define (file-flags-on? checked-flags target-flags)
   (enum-set-subset? target-flags checked-flags))
@@ -77,11 +66,28 @@
   (file-flags read-write write-only read-only))
 
 (define creation-flags-mask 
-  (file-flags cloexec create directory exclusive no-controlling-tty no-follow
-    truncate tmp-file path large-file))
+  (file-flags 
+    cloexec 
+    create 
+    directory 
+    exclusive 
+    no-controlling-tty 
+    no-follow
+    truncate 
+    ; tmp-file 
+    ; path 
+    ; large-file
+  ))
 
 (define status-flags-mask 
-  (file-flags append async direct no-access-time nonblocking data-sync file-sync))
+  (file-flags 
+    append 
+    async 
+    direct 
+    ; no-access-time 
+    nonblocking 
+    data-sync 
+    file-sync))
 
 (define (mask-file-flags flags mask)
   (enum-set-intersection flags mask))
@@ -89,22 +95,8 @@
 (define (file-access-mode flags)
   (mask-file-flags flags access-mode-mask))
 
-; file-flags->integer 
+(define (file-flags->integer flags)
+  (%file-flags->int flags))
 
-; integer->file-flags 
-
-; TODO add aliases for old bindings 
-; (define open/append (flag->int append))
-; ; open/append
-; open/non-blocking
-; open/append
-; open/non-blocking
-; open/read
-; open/write
-; open/read+write
-; open/access-mask 
-; open/create
-; open/exclusive
-; open/no-control-tty
-; open/truncate 
-
+(define (integer->file-flags fixnum)
+  (%int->file-flags fixnum))

@@ -26,7 +26,8 @@
 ;; File System
 (define-structure file-system-test (export)
   (open scsh-user
-        (subset posix-files (file-options file-mode file-mode=? file-mode-
+        scsh-file-flags
+        (subset posix-files (file-mode file-mode=? file-mode-
                              integer->file-mode file-mode->integer))
         (subset scsh-fdport-internal (fdport->fd))
         test-base)

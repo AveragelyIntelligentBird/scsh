@@ -33,8 +33,11 @@
               errno?))
 
 (define-interface scsh-file-syscalls-interface
-  (export %set-cloexec
-	  %open %close-fdes %dup %dup2 %pipe-fdes
+  (export 
+    %get-cloexec %set-cloexec %get-stat-flag %set-stat-flag
+	  %open %close-fdes 
+    %file-flags->int %int->file-flags
+    %dup %dup2 %pipe-fdes
 	  %fd-seek
 	  %char-ready-fdes?
 	  %truncate-file %truncate-fdes
@@ -112,6 +115,16 @@
 	  call-with-input-file call-with-output-file
 	  open-output-file
     initialize-fdport-i/o
+
+    close-on-exec?
+    fdes-flags
+    set-close-on-exec?!
+    set-fdes-flags
+
+    file-status-flags
+    fdes-status
+    set-file-status-flags!
+    set-fdes-status
   
     move->fdes
     dup
@@ -205,6 +218,16 @@
           with-stdio-ports*
           (with-stdio-ports :syntax)
 
+          close-on-exec?
+          fdes-flags
+          set-close-on-exec?!
+          set-fdes-flags
+
+          file-status-flags
+          fdes-status
+          set-file-status-flags!
+          set-fdes-status
+
           call/fdes
           release-port-handle
           port-revealed
@@ -240,12 +263,28 @@
           utf-16le-codec utf-16be-codec
           utf-32le-codec utf-32be-codec))
 
+(define-interface scsh-file-flags-interface
+  (export file-flags?
+	        (file-flags :syntax)
+          file-flags-on? file-flags+ file-flags-
+          access-mode-mask
+          creation-flags-mask
+          status-flags-mask
+          mask-file-flags file-access-mode
+          file-flags->integer 
+          integer->file-flags
+        ))
+
 (define-interface scsh-file-interface
   (export open-file
-
           open-fdes
-          
-          file-options
+
+          file-mode?
+          (file-mode :syntax)
+          file-mode+ file-mode-
+          file-mode=? file-mode<=? file-mode>=?
+          file-mode->integer integer->file-mode
+
           create-directory
           create-fifo
           create-hard-link

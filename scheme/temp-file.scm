@@ -17,9 +17,9 @@
 ;;;
 
 (define (create-temp-file . maybe-prefix)
-  (let ((oflags (file-options write-only
-                              create
-                              exclusive)))
+  (let ((oflags (file-flags write-only
+                            create
+                            exclusive)))
     (apply temp-file-iterate
            (lambda (fname)
              (close-output-port (open-file fname oflags (file-mode owner-read owner-write)))

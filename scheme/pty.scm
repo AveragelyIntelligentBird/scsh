@@ -18,7 +18,7 @@
 
 (define (fork-pty-session thunk)
   (receive (pty-in ttyname) (open-pty)
-    (let ((tty-port (open-file ttyname (file-options read-write))))
+    (let ((tty-port (open-file ttyname (file-flags read-write))))
       (let* ((process (fork (lambda ()
                               (close-input-port pty-in)
                               (become-session-leader)
@@ -50,7 +50,7 @@
       (cond ((next-pty) =>
 	     (lambda (pty-name)
 	       (cond ((with-errno-handler ((errno packet) (else #f))
-		        (open-file pty-name (file-options read-write))) =>
+		        (open-file pty-name (file-flags read-write))) =>
 		      (lambda (pty) ; Score!
 			(values pty (pty-name->tty-name pty-name))))
 

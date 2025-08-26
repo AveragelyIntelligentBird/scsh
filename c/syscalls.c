@@ -181,27 +181,6 @@ s48_ref_t scm_utime_now(s48_call_t call, s48_ref_t sch_path){
 }
 
 
-s48_ref_t set_cloexec(s48_call_t call, s48_ref_t _fd, s48_ref_t _val)
-{
-  int fd = s48_extract_long_2(call, _fd);
-  int val = s48_true_p_2(call, _val) ? 1 : 0;
-  int flags;
-
-  RETRY_OR_RAISE_NEG(flags, fcntl(fd, F_GETFD), "set_cloexec");
-
-  val = -val;	/* 0 -> 0 and 1 -> -1 */
-
-  /* If it's already what we want, just return. */
-  if( (flags & FD_CLOEXEC) == (FD_CLOEXEC & val) ) return s48_false_2(call);
-
-  flags = (flags & ~FD_CLOEXEC) | (val & FD_CLOEXEC);
-
-  if (fcntl(fd, F_SETFD, flags) == -1)
-    s48_os_error_2(call, "set_cloexec", errno, 2, _fd, _val);
-
-  return s48_false_2(call);
-}
-
 /* Process times
 *******************************************************************************
 */
@@ -487,42 +466,93 @@ s48_ref_t scsh_lseek(s48_call_t call, s48_ref_t sch_fdes,
   return s48_enter_long_2(call, retval);
 }
 
-// TODO, WIP
-// Make it smarter once i implement my own file-flags
+/* ************************************************************ */
+/* File flagss.
+ *
+ * We translate the local bits into our own bits and vice versa.
+ */
 
-int
-scsh_extract_file_options(s48_call_t call, s48_ref_t sch_file_options)
+/*
+ * Record types imported from Scheme.
+ */
+static s48_ref_t	file_flags_enum_set_type_binding;
+
+s48_ref_t enter_file_flags(s48_call_t call, int file_flags)
 {
-  int	c_file_options;
-  long	file_options;
+  s48_ref_t	scsh_file_flags;
+  int		    my_file_flags;
 
-  file_options = s48_enum_set2integer_2(call, sch_file_options);
+  my_file_flags =
+    (O_RDWR        & file_flags ? 0000001 : 0) |
+    (O_WRONLY      & file_flags ? 0000002 : 0) |
+    (O_RDONLY      & file_flags ? 0000004 : 0) |
+    (__O_CLOEXEC   & file_flags ? 0000010 : 0) |
+    (O_CREAT       & file_flags ? 0000020 : 0) |
+    (__O_DIRECTORY & file_flags ? 0000040 : 0) |
+    (O_EXCL        & file_flags ? 0000100 : 0) |
+    (O_NOCTTY      & file_flags ? 0000200 : 0) |
+    (__O_NOFOLLOW  & file_flags ? 0000400 : 0) |
+    (O_TRUNC       & file_flags ? 0001000 : 0) |
+    (O_APPEND      & file_flags ? 0002000 : 0) |
+    (O_ASYNC       & file_flags ? 0004000 : 0) |
+    (__O_DIRECT    & file_flags ? 0010000 : 0) |
+    (__O_DSYNC     & file_flags ? 0020000 : 0) |
+    (O_FSYNC       & file_flags ? 0040000 : 0) |
+    (O_NONBLOCK    & file_flags ? 0100000 : 0);
 
-  c_file_options =
-    (00001 & file_options ? O_CREAT    : 0) |
-    (00002 & file_options ? O_EXCL     : 0) |
-    (00004 & file_options ? O_NOCTTY   : 0) |
-    (00010 & file_options ? O_TRUNC    : 0) |
-    (00020 & file_options ? O_APPEND   : 0) |
-    /* POSIX 2nd ed., not in Linux
-    (00040 & file_options ? O_DSYNC    : 0) |
-    */
-    (00100 & file_options ? O_NONBLOCK : 0) |
-    /* POSIX 2nd ed., not in Linux
-    (00200 & file_options ? O_RSYNC    : 0) |
-    */
-    /* Not in FreeBSD
-    (00400 & file_options ? O_SYNC     : 0) |
-    */
-    (01000 & file_options ? O_RDONLY   : 0) |
-    (02000 & file_options ? O_RDWR     : 0) |
-    (04000 & file_options ? O_WRONLY   : 0);
+  scsh_file_flags
+    = s48_integer2enum_set_2(call, file_flags_enum_set_type_binding,
+			     my_file_flags);
 
-  return c_file_options;
+  return scsh_file_flags;
 }
 
-mode_t
-scsh_extract_mode(s48_call_t call, s48_ref_t sch_mode)
+s48_ref_t scsh_num_to_file_flags(s48_call_t call, s48_ref_t scsh_flag_fixnum)
+{
+  int file_flags_num  = s48_extract_long_2(call, scsh_flag_fixnum);
+  return enter_file_flags(call, file_flags_num);
+}
+
+int extract_file_flags(s48_call_t call, s48_ref_t scsh_file_flags)
+{
+  int	c_file_flags;
+  long	file_flags;
+
+  s48_check_enum_set_type_2(call, scsh_file_flags,
+			    file_flags_enum_set_type_binding);
+
+  file_flags = s48_enum_set2integer_2(call, scsh_file_flags);
+
+  // In sync with the enum in file-flags.scm
+  c_file_flags =
+    (0000001 & file_flags ? O_RDWR        : 0) |
+    (0000002 & file_flags ? O_WRONLY      : 0) |
+    (0000004 & file_flags ? O_RDONLY      : 0) |
+    (0000010 & file_flags ? __O_CLOEXEC   : 0) |
+    (0000020 & file_flags ? O_CREAT       : 0) |
+    (0000040 & file_flags ? __O_DIRECTORY : 0) |
+    (0000100 & file_flags ? O_EXCL        : 0) |
+    (0000200 & file_flags ? O_NOCTTY      : 0) |
+    (0000400 & file_flags ? __O_NOFOLLOW  : 0) |
+    (0001000 & file_flags ? O_TRUNC       : 0) |
+    (0002000 & file_flags ? O_APPEND      : 0) |
+    (0004000 & file_flags ? O_ASYNC       : 0) |
+    (0010000 & file_flags ? __O_DIRECT    : 0) |
+    (0020000 & file_flags ? __O_DSYNC     : 0) |
+    (0040000 & file_flags ? O_FSYNC       : 0) |
+    (0100000 & file_flags ? O_NONBLOCK    : 0);
+
+  return c_file_flags;
+}
+
+s48_ref_t scsh_file_flags_to_num(s48_call_t call, s48_ref_t scsh_file_flags)
+{
+  int c_file_flags = extract_file_flags(call, scsh_file_flags);
+
+  return s48_enter_long_2(call, c_file_flags);
+}
+
+mode_t extract_mode(s48_call_t call, s48_ref_t sch_mode)
 {
   long mode = s48_extract_long_2(call, 
     s48_unsafe_record_ref_2(call, sch_mode, 0));
@@ -544,21 +574,35 @@ scsh_extract_mode(s48_call_t call, s48_ref_t sch_mode)
   return c_mode;
 }
 
+/* Non-blocking I/O on file descriptors.
 
+ There appear to be two ways to get non-blocking input and output.  One
+ is to open files with the O_NONBLOCK flag (and to use fcntl() to do the
+ same to stdin and stdout), the other is to call select() on each file
+ descriptor before doing the I/O operation.  O_NONBLOCK has the problem
+ of being a property of the file descriptor, and its use with stdin and
+ stdout can lead to horrible results.
+
+ We use a mixture of both.  For input files we call select() before doing
+ a read(), because read() will return immediately if there are any bytes
+ available at all, and using O_NONBLOCK on stdin is a very bad idea.
+ Output files are opened using O_NONBLOCK and stdout is left alone.
+
+*/
 s48_ref_t scsh_open(s48_call_t call, s48_ref_t path,
-                    s48_ref_t options, s48_ref_t mode)
+                    s48_ref_t flags, s48_ref_t mode)
 {
   int		fd;
 
-  char* c_path  = s48_extract_byte_vector_readonly_2(call, path);
-  int c_options = scsh_extract_file_options(call, options);
-  mode_t c_mode = scsh_extract_mode(call, mode);
+  char*  c_path  = s48_extract_byte_vector_readonly_2(call, path);
+  int    c_flags = extract_file_flags(call, flags);
+  mode_t c_mode  = extract_mode(call, mode);
   
   // Output ports non-blocking by default
-  if ((O_WRONLY & c_options) || (O_RDWR & c_options))
-    c_options |= O_NONBLOCK;
+  if ((O_WRONLY & c_flags) || (O_RDWR & c_flags))
+    c_flags |= O_NONBLOCK;
 
-  RETRY_OR_RAISE_NEG(fd, open(c_path, c_options, c_mode), "posix_open");
+  RETRY_OR_RAISE_NEG(fd, open(c_path, c_flags, c_mode), "posix_open");
 
   return s48_enter_long_2(call, fd);
 }
@@ -742,31 +786,56 @@ s48_ref_t scm_gethostname(s48_call_t call)
 ******************
 */
 
-s48_ref_t fcntl_read(s48_call_t call, s48_ref_t fd, s48_ref_t command)
+s48_ref_t fcntl_cloexec_p(s48_call_t call, s48_ref_t _fd)
 {
-  int ret;
+  int status;
+  int fd = s48_extract_long_2(call, _fd);
+  
+  RETRY_OR_RAISE_NEG(status, fcntl(fd, F_GETFD), "fcntl_cloexec_p");
 
-  RETRY_OR_RAISE_NEG(ret,
-                     fcntl(s48_extract_long_2(call, fd),
-                           s48_extract_long_2(call, command)),
-                     "fcntl_read");
-
-  return s48_enter_long_2(call, ret);
+  return s48_enter_boolean_2(call, status & FD_CLOEXEC);
 }
 
-
-s48_ref_t fcntl_write(s48_call_t call, s48_ref_t fd,
-                      s48_ref_t command, s48_ref_t value)
+s48_ref_t fcntl_set_cloexec(s48_call_t call, s48_ref_t _fd, s48_ref_t _val)
 {
-  int ret;
+  int flags;
+  int fd = s48_extract_long_2(call, _fd);
+  int val = s48_true_p_2(call, _val) ? 1 : 0;
 
-  RETRY_OR_RAISE_NEG(ret,
-                     fcntl(s48_extract_long_2(call, fd),
-                           s48_extract_long_2(call, command),
-                           s48_extract_long_2(call, value)),
-                     "fcntl_write");
+  RETRY_OR_RAISE_NEG(flags, fcntl(fd, F_GETFD), "fcntl_set_cloexec");
 
-  return s48_enter_long_2(call, ret);
+  val = -val;	/* 0 -> 0 and 1 -> -1 */
+
+  /* If it's already what we want, just return. */
+  if( (flags & FD_CLOEXEC) == (FD_CLOEXEC & val) ) return s48_false_2(call);
+
+  flags = (flags & ~FD_CLOEXEC) | (val & FD_CLOEXEC);
+
+  if (fcntl(fd, F_SETFD, flags) == -1)
+    s48_os_error_2(call, "fcntl_set_cloexec", errno, 2, _fd, _val);
+
+  return s48_false_2(call);
+}
+
+s48_ref_t fcntl_get_flags(s48_call_t call, s48_ref_t _fd)
+{
+  int status;
+  int fd = s48_extract_long_2(call, _fd);
+
+  RETRY_OR_RAISE_NEG(status, fcntl(fd, F_GETFL), "fcntl_get_flags");
+
+  return enter_file_flags(call, status); 
+}
+
+s48_ref_t fcntl_set_flags(s48_call_t call, s48_ref_t _fd, s48_ref_t file_flags)
+{
+  int status;
+  int fd = s48_extract_long_2(call, _fd);
+  int c_flags = extract_file_flags(call, file_flags);
+
+  RETRY_OR_RAISE_NEG(status, fcntl(fd, F_SETFL, c_flags), "fcntl_set_flags");
+    
+  return s48_unspecific_2(call);
 }
 
 /* Sleep until time hisecs/losecs (return #t),
@@ -797,6 +866,16 @@ s48_ref_t sleep_until(s48_call_t call, s48_ref_t scm_when)
 }
 
 void s48_on_load(void) {
+  S48_EXPORT_FUNCTION(scsh_file_flags_to_num);
+  S48_EXPORT_FUNCTION(scsh_num_to_file_flags);
+  file_flags_enum_set_type_binding =
+    s48_get_imported_binding_2("file-flags-enum-set-type");
+
+  S48_EXPORT_FUNCTION(fcntl_cloexec_p);
+  S48_EXPORT_FUNCTION(fcntl_set_cloexec);
+  S48_EXPORT_FUNCTION(fcntl_get_flags);
+  S48_EXPORT_FUNCTION(fcntl_set_flags);
+
   S48_EXPORT_FUNCTION(scsh_exit);
   S48_EXPORT_FUNCTION(scsh__exit);
   S48_EXPORT_FUNCTION(scsh_fork);
@@ -831,9 +910,6 @@ void s48_on_load(void) {
   S48_EXPORT_FUNCTION(create_env);
   S48_EXPORT_FUNCTION(align_env);
   S48_EXPORT_FUNCTION(free_envvec);
-  S48_EXPORT_FUNCTION(set_cloexec);
-  S48_EXPORT_FUNCTION(fcntl_read);
-  S48_EXPORT_FUNCTION(fcntl_write);
   S48_EXPORT_FUNCTION(sleep_until);
   S48_EXPORT_FUNCTION(scm_gethostname);
 

@@ -189,7 +189,7 @@
 	   name-1 'file-system
 	   (lambda (fname . params)
 	     (with-cwd (create-temp-dir)
-		       (let ((port (open/create-file fname (file-options write-only))))
+		       (let ((port (open/create-file fname (file-flags write-only))))
 			 (if before-func (before-func port))
 			 (let ((result (apply func (cons fname params))))
 			   (close port)
@@ -204,7 +204,7 @@
 	   name-2 'file-system
 	   (lambda (fname . params)
 	     (with-cwd (create-temp-dir)
-		       (let ((port (open/create-file fname (file-options write-only))))
+		       (let ((port (open/create-file fname (file-flags write-only))))
 			 (if before-func (before-func port))
 			 (let ((result (apply func (cons (fdport->fd port)
 							 params))))
@@ -220,7 +220,7 @@
 	   name-3 'file-system
 	   (lambda (fname . params)
 	     (with-cwd (create-temp-dir)
-		       (let ((port (open/create-file fname (file-options write-only))))
+		       (let ((port (open/create-file fname (file-flags write-only))))
 			 (if before-func (before-func port))
 			 (let ((result (apply func (cons port params))))
 			   (close port)
@@ -292,7 +292,7 @@
 	   (lambda (fname)
 	     (with-cwd (create-temp-dir)
 		       (create-file fname)
-		       (let ((port (open-file fname (file-options write-only))))
+		       (let ((port (open-file fname (file-flags write-only))))
 			 (display "1" port)
 			 (let ((res-1 (file:size fname)))
 			   (sync-file port)

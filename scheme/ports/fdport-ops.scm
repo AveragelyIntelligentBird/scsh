@@ -43,32 +43,33 @@
 ;;; File open and close -> fdport
 ;;; ----------------------------------
 
-(define (open-fdes fname options . maybe-mode)
-  (let* ((mode (:optional maybe-mode (file-mode read write))) ; #o666 
+(define (open-fdes fname flags . maybe-mode)
+  (let* ((mode     (:optional maybe-mode (file-mode read write))) ; #o666 
          (mode-arg (cond ((file-mode? mode) mode)
                          ((integer? mode) (integer->file-mode mode))
                          (else (error "Invalid file mode (not number or file-mode)" mode)))))
     (with-resources-aligned
-              (list cwd-resource umask-resource euid-resource egid-resource)
-              (lambda () (%open fname options mode-arg)))))
+      (list cwd-resource umask-resource euid-resource egid-resource)
+      (lambda () (%open fname flags mode-arg)))))
 
-(define (open-file fname options . maybe-mode)
-  (let ((fd (apply open-fdes fname options maybe-mode))
-        (input? (file-options-on? options (file-options read-only))))
+(define (open-file fname flags . maybe-mode)
+  (let ((fd (apply open-fdes fname flags maybe-mode))
+        (input? (file-flags-on? flags (file-flags read-only))))
     (if input?
       (make-input-fdport/fd  fd 0 fname)
       (make-output-fdport/fd fd 0 fname))))
 
-(define (open-input-file fname . maybe-options)
-  (let ((options (:optional maybe-options (file-options))))
-    (open-file fname (file-options-union options (file-options read-only)))))
+(define (open-input-file fname . maybe-flags)
+  (let* ((flags (:optional maybe-flags (file-flags)))
+         (flags (file-flags+ flags (file-flags read-only))))
+    (open-file fname flags)))
 
 (define (open-output-file fname . rest)
-  (let* ((options (if (pair? rest) (car rest)
-                      (file-options create truncate))) ; default
-         (maybe-mode (if (null? rest) '() (cdr rest)))
-         (options (file-options-union options (file-options write-only))))
-    (apply open-file fname options maybe-mode)))
+  (let* ((flags (if (pair? rest) (car rest)
+                      (file-flags create truncate))) ; default
+         (flags (file-flags+ flags (file-flags write-only)))
+         (maybe-mode (if (null? rest) '() (cdr rest))))
+    (apply open-file fname flags maybe-mode)))
 
 ;;; Port/fd ops
 ;;; ----------------------------------
@@ -200,13 +201,13 @@
   (%dup2 (port->fdes (open-file (stringify path) flags (file-mode read write))) fdes))
 
 (define create+trunc
-  (file-options write-only create truncate))
+  (file-flags write-only create truncate))
 
 (define write+append+create
-  (file-options write-only append create))
+  (file-flags write-only append create))
 
 (define read-only
-  (file-options read-only))
+  (file-flags read-only))
 
 ;;; Generic port operations
 ;;; -----------------------
@@ -307,15 +308,6 @@
              (values r w)))
          (%pipe-fdes)))
 
-; TBD: generic fcntl()'s F_GETFD and F_SETFD AND a shorthand for just close-on-exec?
-; (fdes-flags fd/port)     --->     integer         (procedure) 
-; (set-fdes-flags fd/port integer)     --->     undefined         (procedure) 
-
-;;; Straight CALL/FDES modifies unrevealed file
-;;; descriptors by clearing their CLOEXEC bit when it reveals them -- so it
-;;; would interfere with the reading and writing of that bit!
-
-
 ;;; Some of fcntl()
 ;;;;;;;;;;;;;;;;;;;
 
@@ -325,22 +317,27 @@
 ;;; descriptors by clearing their CLOEXEC bit when it reveals them -- so it
 ;;; would interfere with the reading and writing of that bit!
 
-; (define (fdes-flags fd/port)
-;   (sleazy-call/fdes fd/port
-;     (lambda (fd) (%fcntl-read fd fcntl/get-fdes-flags))))
 
-; (define (set-fdes-flags fd/port flags)
-;   (sleazy-call/fdes fd/port
-;     (lambda (fd) (%fcntl-write fd fcntl/set-fdes-flags flags))))
+(define (close-on-exec? fd/port)
+  (sleazy-call/fdes fd/port
+    (lambda (fd) (%get-cloexec fd))))
+(define fdes-flags close-on-exec?)
+    
+(define (set-close-on-exec?! fd/port cloexec?)
+  (sleazy-call/fdes fd/port
+    (lambda (fd) (%set-cloexec fd cloexec?))))
+(define set-fdes-flags set-close-on-exec?!)
 
-; ;;; fcntl()'s F_GETFL and F_SETFL.
-; ;;; Get: Returns open flags + get-status flags (below)
-; ;;; Set: append, sync, async, nbio, nonblocking, no-delay
+;;; fcntl()'s F_GETFL and F_SETFL.
+;;; Get: Returns open flags + get-status flags (below)
+;;; Set: append, sync, async, nbio, nonblocking, no-delay
 
-; (define (fdes-status fd/port)
-;   (sleazy-call/fdes fd/port
-;     (lambda (fd) (%fcntl-read fd fcntl/get-status-flags))))
-
-; (define (set-fdes-status fd/port flags)
-;   (sleazy-call/fdes fd/port
-;     (lambda (fd) (%fcntl-write fd fcntl/set-status-flags flags))))
+(define (file-status-flags fd/port)
+  (sleazy-call/fdes fd/port
+    (lambda (fd) (%get-stat-flag fd))))
+(define fdes-status file-status-flags)
+    
+(define (set-file-status-flags! fd/port flags)
+  (sleazy-call/fdes fd/port
+    (lambda (fd) (%set-stat-flag fd flags))))
+(define set-fdes-status set-file-status-flags!)

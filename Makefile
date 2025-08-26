@@ -89,6 +89,7 @@ SCHEME = scheme/command-line.scm \
 	 scheme/ports/bufpol.scm \
 	 scheme/ports/stdio.scm \
 	 scheme/ports/stringcoll.scm \
+	 scheme/file-flags.scm \
 	 scheme/process-high-level.scm \
 	 scheme/process-state.scm \
 	 scheme/process.scm \

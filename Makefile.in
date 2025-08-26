@@ -84,6 +84,7 @@ SCHEME = scheme/command-line.scm \
 	 scheme/ports/port-collect.scm \
 	 scheme/ports/portmakers.scm \
 	 scheme/ports/channel-port.scm \
+	 scheme/file-flags.scm \
 	 scheme/process-high-level.scm \
 	 scheme/process-state.scm \
 	 scheme/process.scm \

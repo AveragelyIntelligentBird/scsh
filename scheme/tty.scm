@@ -322,10 +322,10 @@
 ;;; SunOS, and SVR4.
 
 (define (open-control-tty ttyname . maybe-flags)
-  (let ((flags (:optional maybe-flags (file-options read-write))))
+  (let ((flags (:optional maybe-flags (file-flags read-write))))
       (let ((fd (%open-control-tty ttyname flags)))
-	((if (or (file-options-on? flags (file-options read-only))
-		 (file-options-on? flags (file-options read-write)))
+	((if (or (file-flags-on? flags (file-flags read-only))
+		 (file-flags-on? flags (file-flags read-write)))
        make-input-fdport/fd
 	     make-output-fdport/fd)
 	 fd 1))))

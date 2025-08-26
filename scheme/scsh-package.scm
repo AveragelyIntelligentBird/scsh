@@ -288,14 +288,13 @@
           (expose port->fd
                   dup
                   dup2)) 
-        (modify posix-files (rename (open-file s48-open-file))
-                (expose open-file
-                        file-options
-                        file-options-on?
-                        file-options-union
-                        file-mode
-                        file-mode?
-                        integer->file-mode))
+        scsh-file-flags
+        (modify posix-files
+            (expose file-mode
+                    file-mode?
+                    file-mode+ file-mode-
+                    file-mode=? file-mode<=? file-mode>=?
+                    file-mode->integer integer->file-mode))
         (subset architecture (channel-status-option))
         (subset interrupts (enable-interrupts!
                             disable-interrupts!
@@ -328,6 +327,17 @@
 (define-structure scsh-port-codecs scsh-text-codecs-interface
   (open text-codecs
         (subset i/o (port-text-codec set-port-text-codec!))))
+
+(define-structure scsh-file-flags scsh-file-flags-interface
+  (open scheme 
+        define-record-types 
+        finite-types
+        enum-sets
+        external-calls 
+        load-dynamic-externals
+        bitwise
+        scsh-file-syscalls)
+  (files file-flags))
 
 (define-structure scsh-file scsh-file-interface
   (open (modify scheme (hide call-with-input-file
@@ -389,7 +399,8 @@
         fluids
         (subset scsh-utilities (make-reinitializer))
         (subset signals (error))
-        (subset posix-files (file-options file-mode))
+        scsh-file-flags
+        (subset posix-files (file-mode))
         scsh-environment
         scsh-errnos
         scsh-process-state
@@ -500,7 +511,6 @@
         debug-messages		
         (subset signals (error warn))
         (subset srfi-13 (string-index))
-        ; (subset command-levels (session-started? set-batch-mode?!))
         (subset command-state (set-batch-mode?!))
         (subset scsh-utilities (mapv! stringify))
         (subset scsh-environment (alist->env-list getenv environ-resource))
@@ -548,7 +558,7 @@
         let-opt
         define-record-types
         tty-flags scsh-internal-tty-flags
-        (subset posix-files (file-options file-options-on?))
+        scsh-file-flags
         (subset external-calls (import-lambda-definition-2))
         (subset os-strings (string->os-string
                             os-string->byte-vector))
@@ -597,7 +607,7 @@
         scsh-fdports
         (subset signals (error))
         (subset external-calls (import-lambda-definition-2))
-        (subset posix-files (file-options))
+        scsh-file-flags
         (subset scsh-errnos (with-errno-handler))
         (subset scsh-syscall-support (byte-vector->string))
         scsh-stdio
@@ -694,6 +704,7 @@
                         scsh-io-interface
                         scsh-bufpol-interface
                         scsh-text-codecs-interface
+                        scsh-file-flags-interface
                         scsh-file-interface
                         scsh-globbing-interface
                         scsh-temp-files-interface
@@ -761,6 +772,7 @@
         scsh-fdports
         scsh-fdport-internal
         scsh-port-codecs
+        scsh-file-flags
         scsh-file
         scsh-temp-files
         scsh-globbing

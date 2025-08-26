@@ -40,11 +40,21 @@ s48_ref_t scsh_lseek(s48_call_t call, s48_ref_t sch_fdes, s48_ref_t sch_offset,
 
 s48_ref_t scsh_open(s48_call_t call, s48_ref_t path, s48_ref_t options, s48_ref_t mode);
 
+s48_ref_t scsh_file_flags_to_num(s48_call_t call, s48_ref_t scsh_file_flags);
+
+s48_ref_t scsh_num_to_file_flags(s48_call_t call, s48_ref_t scsh_flag_fixnum);
+
+s48_ref_t fcntl_cloexec_p(s48_call_t call, s48_ref_t _fd); 
+
+s48_ref_t fcntl_set_cloexec(s48_call_t call, s48_ref_t _fd, s48_ref_t _val);
+
+s48_ref_t fcntl_get_flags(s48_call_t call, s48_ref_t _fd);
+
+s48_ref_t fcntl_set_flags(s48_call_t call, s48_ref_t _fd, s48_ref_t file_flags);
+
 s48_ref_t scm_utime(s48_call_t call, s48_ref_t path, s48_ref_t ac, s48_ref_t mod);
 
 s48_ref_t scm_utime_now(s48_call_t call, s48_ref_t path);
-
-s48_ref_t set_cloexec(s48_call_t call, s48_ref_t _fd, s48_ref_t _val);
 
 s48_ref_t scsh_chdir(s48_call_t call, s48_ref_t directory);
 
