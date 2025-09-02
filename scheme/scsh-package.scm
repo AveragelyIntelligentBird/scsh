@@ -428,7 +428,6 @@
         threads
         locks
         placeholders
-        ;; sigevents
         bitwise
         tables
         weak-tables
@@ -448,7 +447,6 @@
         (subset srfi-1 (delete filter))
         (subset scsh-utilities (check-arg make-reinitializer
                                 with-lock run-as-long-as))
-        low-interrupt
         (subset external-calls (import-lambda-definition-2))
         scsh-errnos
         scsh-file-names
@@ -827,8 +825,6 @@
         queues scheduler
         scsh-utilities
         interrupts
-        low-interrupt
-        ;; sigevents
         (modify primitives (hide wait
                                  write-char
                                  read-char
@@ -880,10 +876,9 @@
         extended-ports
         fluids
         interfaces
-        ;; sigevents
         scsh-reader
         scsh-here-string-hax
-        low-interrupt wind
+        wind
         fluids-internal            ; JMG: get-dynamic-env
         handle                     ; JMG: with-handler
         interrupts
@@ -1019,47 +1014,12 @@
         (subset srfi-14 (char-set)))
   (files here))
 
-;; (define-structure sigevents sigevents-interface
-;;    (open scsh-level-0
-;;          (modify scheme (hide write
-;;                               display
-;;                               char-ready?
-;;                               read-char
-;;                               write-char
-;;                               newline))
-;;          low-interrupt
-;;          define-record-types
-;;          threads
-;;          (subset srfi-1 (filter))
-;;          (subset scsh-utilities (run-as-long-as))
-;;          (subset signals (error))
-;;          (subset queues (make-queue))
-;;          (subset proposals (with-new-proposal))
-;;          (subset threads-internal (maybe-commit-and-make-ready
-;;                                    maybe-commit-and-block-on-queue
-;;                                    maybe-dequeue-thread!
-;;                                    thread-queue-empty?))
-;;          (subset interrupts (with-interrupts-inhibited))
-;;          (subset posix-processes (name->signal
-;;                                   signal-os-number
-;;                                   make-signal-queue
-;;                                   dequeue-signal!
-;;                                   signal=?)))
-;;    (files event))
-
 (define-structure simple-syntax (export define-simple-syntax)
   (open scheme)
   (begin (define-syntax define-simple-syntax
            (syntax-rules ()
              ((define-simple-syntax (name . pattern) result)
               (define-syntax name (syntax-rules () ((name . pattern) result))))))))
-
-(define-structure low-interrupt low-interrupt-interface
-  (open scheme
-        enumerated
-        bigbit
-        bitwise)
-  (files low-interrupt))
 
 (define-structure scsh-threads
   (export fork/thread

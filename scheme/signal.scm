@@ -1,5 +1,8 @@
-;;; Signals (rather incomplete)
-;;; ---------------------------
+;;; Signal System -------------------------------------------------------------
+;; Part of scsh 0.7. See file COPYING for notices and license.
+;; Signal handling.
+
+;; Currently very short since most of the interface is provided by Scheme48
 
 (import-lambda-definition-2 signal-pid (pid signal) "scsh_kill")
 

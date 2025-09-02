@@ -973,44 +973,6 @@
 	  tty-name->pty-name
 	  make-pty-generator))
 
-;; (define-interface sigevents-interface
-;;   (export most-recent-sigevent
-;;           sigevent?
-;;           next-sigevent
-;;           next-sigevent/no-wait
-;;           with-sigevents
-;;           sigevent-type))
-
-(define-interface low-interrupt-interface
-  (export number-of-interrupts
-          interrupt/alrm interrupt/alarm
-          interrupt/int  interrupt/keyboard
-          interrupt/post-gc
-          interrupt/i/o-completion
-          interrupt/chld
-          interrupt/cont
-          interrupt/hup
-          interrupt/quit
-          interrupt/term
-          interrupt/tstp
-          interrupt/usr1
-          interrupt/usr2
-          interrupt/info
-          interrupt/io
-          interrupt/poll
-          interrupt/prof
-          interrupt/pwr
-          interrupt/urg
-          interrupt/vtalrm
-          interrupt/winch
-          interrupt/xcpu
-          interrupt/xfsz
-          interrupt-set
-          interrupt-in-set?
-          insert-interrupt
-          remove-interrupt
-          full-interrupt-set))
-
 ;; (define-interface dot-locking-interface
 ;;   (export obtain-dot-lock release-dot-lock
 ;;           break-dot-lock

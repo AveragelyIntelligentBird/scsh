@@ -16,7 +16,7 @@ is discussed separately in @secref["networking-chapter"].
 @include-section["syscalls/db-access.scrbl"]
 @include-section["syscalls/cli-args.scrbl"]
 @include-section["syscalls/sys-param.scrbl"]
-@include-section["syscall-signal.scrbl"]
+@include-section["syscalls/signals.scrbl"]
 @include-section["syscalls/time-and-date.scrbl"]
 @include-section["syscalls/environment-vars.scrbl"]
 @include-section["syscall-tty.scrbl"]

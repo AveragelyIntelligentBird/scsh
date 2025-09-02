@@ -66,7 +66,6 @@ SCHEME = scheme/command-line.scm \
 	 scheme/directory.scm \
 	 scheme/enumconst.scm \
 	 scheme/environment.scm \
-	 scheme/event.scm \
 	 scheme/ports/fdports.scm \
 	 scheme/file.scm \
 	 scheme/fileinfo.scm \
@@ -79,7 +78,6 @@ SCHEME = scheme/command-line.scm \
 	 scheme/here.scm \
 	 scheme/lib-dirs.scm \
 	 scheme/libscsh.scm \
-	 scheme/low-interrupt.scm \
 	 scheme/md5.scm \
 	 scheme/meta-arg.scm \
 	 scheme/ports/fdports.scm \
