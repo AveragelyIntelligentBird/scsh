@@ -35,12 +35,13 @@
 (define-r5rs-input (read-char) input #f real-read-char
   (let ((port (fdes->inport input)))
     (real-read-char port)))
-
+;; TODO redo these, embarrassing tbh,,,
 (define-r5rs-input (char-ready?) input #f real-char-ready?
   (%char-ready-fdes? input))
 
 (define-r5rs-input (peek-char) input #t real-peek-char)
 
+; cannot peek-char, peek-byte, read on unbuffered ports?
 ; TODO (read) groan; only on ports because of peeking
 
 ;;; Output Ops ----------------------------------------------------------------

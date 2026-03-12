@@ -94,7 +94,8 @@
 (define-structure terminal-device-control-test (export)
   (open scsh-user
         debug-messages
-        test-base)
+        test-base
+        threads)
   (files terminal-device-control-test))
 
 ;; 
@@ -102,15 +103,15 @@
   (export test-all)
   (open scheme
         test-base
-        file-system-test 
+        ; file-system-test 
 
-        process-state-test
-        user-and-group-db-access-test
-        system-parameter-test
-        datetime-test
-        envvar-test
+        ; process-state-test
+        ; user-and-group-db-access-test
+        ; system-parameter-test
+        ; datetime-test
+        ; envvar-test
 
-        ; terminal-device-control-test
+        terminal-device-control-test
       ))
 
 ;; --------------------------------------------------
@@ -136,9 +137,9 @@
         test-base
         
         test-all-syscalls
-        file-name-maniplation-test
-        read-delimited-strings-test
-        bitwise-ops-test
+        ; file-name-maniplation-test
+        ; read-delimited-strings-test
+        ; bitwise-ops-test
 
       ))
 

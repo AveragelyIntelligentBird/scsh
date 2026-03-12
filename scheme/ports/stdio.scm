@@ -30,10 +30,12 @@
   (with-error-output-port* port (lambda () body ...)))
 
 ;; TODO what to do with you??
-;; (define (stdio->stdports)
-;;   (set-current-input-port!  (fdes->inport 0))
-;;   (set-current-output-port! (fdes->outport 1))
-;;   (set-current-error-port!   (fdes->outport 2)))
+
+(define (stdio->stdports)
+  (reset-fdport-channel/fd (current-input-port) 0) ;??
+  ; (reset-fdport-channel/fd (current-output-port) 1)
+  ; (reset-fdport-channel/fd (current-error-port) 2)
+)
 
 ; This is probably no a thing anymore either
 ; just assume that stdio is stdio unless modified for a thunk with 
@@ -45,6 +47,7 @@
   (dup (current-output-port) 1)
   (dup (current-error-port)  2))
 
+; THESE ARE NOT NEEDED, ALWAYS EQUIVALENT TO scsh TOPLEVEL  
 (define (with-stdio-ports* thunk)
   (with-current-input-port (fdes->inport 0)
     (with-current-output-port (fdes->outport 1)
